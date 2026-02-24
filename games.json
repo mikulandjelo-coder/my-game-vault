@@ -1,0 +1,45 @@
+{
+  "franchises": [
+    {
+      "id": "franchise-frogger",
+      "name": "Frogger",
+      "coverImg": "https://placehold.co/400x600?text=Frogger+Franchise",
+      "description": "The classic arcade hopping saga.",
+      "mainGames": [
+        {
+          "id": "game-frogger-81",
+          "title": "Frogger",
+          "originalYear": 1981,
+          "originalPlatform": "Arcade",
+          "ports": [
+            {
+              "id": "port-c64",
+              "platform": "Commodore 64",
+              "year": 1983,
+              "status": "Not Played",
+              "score": 75
+            },
+            {
+              "id": "port-atari-2600",
+              "platform": "Atari 2600",
+              "year": 1982,
+              "status": "Explored",
+              "score": 80
+            }
+          ],
+          "remakes": [],
+          "sequels": ["game-frogger-quest"]
+        },
+        {
+          "id": "game-frogger-quest",
+          "title": "Frogger: The Great Quest",
+          "originalYear": 2001,
+          "originalPlatform": "PS2",
+          "ports": [],
+          "remakes": [],
+          "sequels": []
+        }
+      ]
+    }
+  ]
+}
