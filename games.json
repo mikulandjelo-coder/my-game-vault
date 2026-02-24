@@ -3,41 +3,32 @@
     {
       "id": "franchise-frogger",
       "name": "Frogger",
-      "coverImg": "https://placehold.co/400x600?text=Frogger+Franchise",
-      "description": "The classic arcade hopping saga.",
+      "coverImg": "https://upload.wikimedia.org/wikipedia/en/thumb/2/22/Frogger_game_arcade_flyer.jpg/220px-Frogger_game_arcade_flyer.jpg",
+      "exploredPercent": 80,
       "mainGames": [
         {
-          "id": "game-frogger-81",
+          "id": "frogger-1",
           "title": "Frogger",
-          "originalYear": 1981,
-          "originalPlatform": "Arcade",
+          "year": 1981,
+          "platform": "Arcade",
+          "coverImg": "https://placehold.co/150x200?text=Frogger+81",
           "ports": [
-            {
-              "id": "port-c64",
-              "platform": "Commodore 64",
-              "year": 1983,
-              "status": "Not Played",
-              "score": 75
-            },
-            {
-              "id": "port-atari-2600",
-              "platform": "Atari 2600",
-              "year": 1982,
-              "status": "Explored",
-              "score": 80
-            }
+            { "id": "p1", "title": "Frogger", "year": 1983, "platform": "Commodore 64", "coverImg": "https://placehold.co/100x150?text=C64", "status": "Explored", "score": 75 },
+            { "id": "p2", "title": "Frogger", "year": 1982, "platform": "Atari 2600", "coverImg": "https://placehold.co/100x150?text=Atari", "status": "Not Played", "score": 68 }
           ],
-          "remakes": [],
-          "sequels": ["game-frogger-quest"]
+          "remakes": [
+            { "id": "r1", "title": "Frogger (3D)", "year": 1997, "platform": "PC", "coverImg": "https://placehold.co/100x150?text=PC+Remake", "status": "Completed", "score": 85 }
+          ],
+          "sequels": [
+            { "id": "s1", "title": "Frogger II: ThreeeDeep!", "year": 1984, "platform": "Arcade", "coverImg": "https://placehold.co/100x150?text=Sequel", "status": "Tried", "score": 70 }
+          ]
         },
         {
-          "id": "game-frogger-quest",
+          "id": "frogger-2",
           "title": "Frogger: The Great Quest",
-          "originalYear": 2001,
-          "originalPlatform": "PS2",
-          "ports": [],
-          "remakes": [],
-          "sequels": []
+          "year": 2001,
+          "platform": "PS2",
+          "coverImg": "https://placehold.co/150x200?text=Great+Quest"
         }
       ]
     }
