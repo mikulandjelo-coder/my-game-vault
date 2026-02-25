@@ -295,7 +295,61 @@ function renderWishlist(franchises, container) {
     html += `</div>`;
     container.innerHTML = html;
 }
+// --- NEW: DATA MANAGEMENT (EXPORT / IMPORT) ---
+function exportVault() {
+    // 1. Grab the data from the browser
+    const vaultData = localStorage.getItem('myVaultData');
+    if (!vaultData) {
+        alert("Your vault is empty!");
+        return;
+    }
 
+    // 2. Turn it into a downloadable text file (Blob)
+    const blob = new Blob([vaultData], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    
+    // 3. Create a fake link, click it automatically, and destroy it
+    const a = document.createElement('a');
+    a.href = url;
+    // Names the file "GameVault_Backup_2024-XX-XX.json"
+    a.download = `GameVault_Backup_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function importVault(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // 1. Confirm with the user because this overwrites existing data
+    if (!confirm("⚠️ This will overwrite your current vault with the imported backup. Continue?")) {
+        event.target.value = ''; // Reset the file input
+        return;
+    }
+
+    // 2. Read the file
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const importedData = JSON.parse(e.target.result);
+            
+            // 3. Do a quick check to make sure it's actually a Game Vault file
+            if (importedData && importedData.franchises) {
+                localStorage.setItem('myVaultData', JSON.stringify(importedData));
+                alert("Vault imported successfully!");
+                loadLibrary(); // Redraw the screen!
+            } else {
+                alert("Error: Invalid backup file. It doesn't look like Game Vault data.");
+            }
+        } catch (err) {
+            alert("Error reading file. Make sure it's a valid JSON backup.");
+        }
+        event.target.value = ''; // Reset the file input so you can import the same file again later if needed
+    };
+    reader.readAsText(file);
+}
 // --- Navigation Helpers ---
 function openWishlist() {
     state.view = 'wishlist';
