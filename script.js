@@ -21,6 +21,12 @@ const getStatusColor = (status) => {
 
 window.onload = function() {
     loadLibrary();
+    
+    // NEW: Listen for changes on the Franchise dropdown
+    const franchiseSelect = document.getElementById('gFranchise');
+    if (franchiseSelect) {
+        franchiseSelect.addEventListener('change', updateParentDropdown);
+    }
 };
 
 async function loadLibrary() {
@@ -448,6 +454,26 @@ function openFranchiseEdit(id) {
 // ==========================================
 // --- MODAL & DYNAMIC FORM LOGIC ---
 // ==========================================
+// --- NEW: Dynamic Dropdown Linker ---
+function updateParentDropdown() {
+    let vaultData = JSON.parse(localStorage.getItem('myVaultData'));
+    const franchiseId = document.getElementById('gFranchise').value;
+    const parentSelect = document.getElementById('gParent');
+    
+    parentSelect.innerHTML = ''; // Clear the old static list!
+    
+    if (!vaultData || !franchiseId) return;
+    
+    // Find the currently selected franchise
+    const franchise = vaultData.franchises.find(f => f.id === franchiseId);
+    
+    // Populate the dropdown with its Main Games
+    if (franchise && franchise.mainGames) {
+        franchise.mainGames.forEach(game => {
+            parentSelect.innerHTML += `<option value="${game.id}">${game.title}</option>`;
+        });
+    }
+}
 function openModal() {
     state.editingGameId = null; 
     document.querySelector('#addModal h2').innerText = "Add New Entry";
@@ -467,6 +493,18 @@ function openModal() {
             franchiseSelect.innerHTML += `<option value="${f.id}">${f.name}</option>`;
         });
     }
+}
+// ... inside openModal() ...
+let vaultData = JSON.parse(localStorage.getItem('myVaultData'));
+const franchiseSelect = document.getElementById('gFranchise');
+if (franchiseSelect && vaultData) {
+    franchiseSelect.innerHTML = ''; 
+    vaultData.franchises.forEach(f => {
+        franchiseSelect.innerHTML += `<option value="${f.id}">${f.name}</option>`;
+    });
+    
+    // NEW: Populate the 'Attach to' list for the first franchise!
+    updateParentDropdown(); 
 }
 
 function closeModal() {
