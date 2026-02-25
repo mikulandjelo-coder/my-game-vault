@@ -1,9 +1,10 @@
 // 1. App State Tracker
 let state = {
-    view: 'franchises', // Can be 'franchises', 'mainGames', or 'allGames'
+    view: 'franchises', 
     activeFranchiseId: null,
     activeSubId: null,
-    activeCategory: null
+    activeCategory: null,
+    editingGameId: null // <--- NEW: Tracks the game we are editing!
 };
 
 window.onload = function() {
@@ -23,6 +24,7 @@ async function loadLibrary() {
     container.innerHTML = ''; 
 
     // --- NEW: Handle the 'allGames' view ---
+    // --- Routing ---
     if (state.view === 'franchises') {
         renderFranchises(vaultData.franchises, container);
     } else if (state.view === 'mainGames') {
@@ -32,7 +34,10 @@ async function loadLibrary() {
     } else if (state.view === 'allGames') {
         const franchise = vaultData.franchises.find(f => f.id === state.activeFranchiseId);
         renderFranchises([franchise], container); 
-        renderAllGames(franchise, container); // <--- Triggers the new grid!
+        renderAllGames(franchise, container); 
+    } else if (state.view === 'wishlist') {
+        // NEW: Trigger the wishlist!
+        renderWishlist(vaultData.franchises, container); 
     }
 }
 
@@ -157,13 +162,30 @@ function renderAllGames(franchise, container) {
         if (item.type === 'Sequel') badgeColor = 'bg-yellow-600';
 
         html += `
-            <div class="bg-gray-800 p-3 rounded-lg border border-gray-700 shadow relative flex flex-col hover:border-gray-500 transition">
-                <span class="absolute top-2 right-2 ${badgeColor} text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg z-10">${item.type}</span>
-<img src="${item.coverImg}" class="w-full aspect-[80/107] object-cover rounded mb-3 shadow-md">
-                <h4 class="font-bold text-white text-sm leading-tight mb-1">${item.title}</h4>
-                <p class="text-gray-400 text-xs mt-auto">${item.year} | ${item.platform}</p>
+        <div class="bg-gray-800 p-3 rounded-lg border border-gray-700 shadow relative flex flex-col hover:border-gray-500 transition">
+            
+            <button onclick="deleteGame('${item.id}')" class="absolute top-2 left-2 bg-red-600 hover:bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-lg z-20 transition">
+                &times;
+            </button>
+
+            <button onclick="openEditModal('${item.id}')" class="absolute top-2 left-10 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded text-[10px] font-bold shadow-lg z-20 transition tracking-wider">
+                EDIT
+            </button>
+
+            <span class="absolute top-2 right-2 ${badgeColor} text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg z-10">${item.type}</span>
+            
+            <img src="${item.coverImg}" class="w-full aspect-[80/107] object-cover rounded mb-3 shadow-md">
+            <h4 class="font-bold text-white text-sm leading-tight mb-1">${item.title}</h4>
+            
+            <div class="mt-auto pt-2 border-t border-gray-700">
+                <p class="text-gray-300 text-xs mb-1">${item.year} | ${item.platform}</p>
+                <div class="flex justify-between text-[10px] font-bold uppercase tracking-wider">
+                    <span class="text-purple-400">${item.status || 'Not Played'}</span>
+                    <span class="text-green-400">${item.ownership || 'Not Owned'}</span>
+                </div>
             </div>
-        `;
+        </div>
+    `;
     });
 
     html += `</div>`;
@@ -200,6 +222,89 @@ function calculateExploredPercentage(franchise) {
     // Do the math and round it to a whole number!
     return Math.round((exploredGames / totalGames) * 100);
 }
+// --- NEW: Render the Global Wishlist ---
+function renderWishlist(franchises, container) {
+    let wishlistGames = [];
+
+    // 1. The Great Crawl: Search every corner of the vault for Wishlisted games
+    franchises.forEach(f => {
+        if (f.mainGames) {
+            f.mainGames.forEach(g => {
+                if (g.ownership === 'Wishlisted') wishlistGames.push({...g, franchiseName: f.name, type: 'Main Game'});
+                if (g.ports) g.ports.forEach(p => { if (p.ownership === 'Wishlisted') wishlistGames.push({...p, franchiseName: f.name, type: 'Port'}); });
+                if (g.remakes) g.remakes.forEach(r => { if (r.ownership === 'Wishlisted') wishlistGames.push({...r, franchiseName: f.name, type: 'Remake'}); });
+                if (g.sequels) g.sequels.forEach(s => { if (s.ownership === 'Wishlisted') wishlistGames.push({...s, franchiseName: f.name, type: 'Sequel'}); });
+            });
+        }
+    });
+
+    // 2. Empty State
+    if (wishlistGames.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-20 bg-gray-800 rounded-xl border border-gray-700 mt-8">
+                <h2 class="text-3xl text-gray-300 font-bold mb-4">Your wishlist is empty!</h2>
+                <p class="text-gray-500">Games marked with the "Wishlisted" ownership status will appear here.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // 3. Sort them by Year
+    wishlistGames.sort((a, b) => a.year - b.year);
+
+    // 4. Build the UI
+    let html = `
+        <div class="mb-6 flex justify-between items-center mt-4">
+            <h2 class="text-3xl font-bold text-yellow-500 flex items-center gap-2">⭐ My Wishlist</h2>
+            <button onclick="goHome()" class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded font-bold shadow transition">← Back to Vault</button>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-12">
+    `;
+
+    // 5. Draw the Cards (complete with Edit/Delete buttons!)
+    wishlistGames.forEach(item => {
+        let badgeColor = item.type === 'Main Game' ? 'bg-purple-600' : item.type === 'Port' ? 'bg-green-600' : item.type === 'Remake' ? 'bg-blue-600' : 'bg-yellow-600';
+
+        html += `
+            <div class="bg-gray-800 p-3 rounded-lg border border-gray-700 shadow relative flex flex-col hover:border-yellow-500/50 transition">
+                
+                <button onclick="deleteGame('${item.id}')" class="absolute top-2 left-2 bg-red-600 hover:bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-lg z-20 transition">&times;</button>
+                <button onclick="openEditModal('${item.id}')" class="absolute top-2 left-10 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded text-[10px] font-bold shadow-lg z-20 transition tracking-wider">EDIT</button>
+                <span class="absolute top-2 right-2 ${badgeColor} text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg z-10">${item.type}</span>
+                
+                <img src="${item.coverImg}" class="w-full aspect-[80/107] object-cover rounded mb-3 shadow-md">
+                
+                <p class="text-yellow-500 text-[10px] font-bold uppercase tracking-wider mb-1">${item.franchiseName}</p>
+                <h4 class="font-bold text-white text-sm leading-tight mb-1">${item.title}</h4>
+                
+                <div class="mt-auto pt-2 border-t border-gray-700">
+                    <p class="text-gray-300 text-xs mb-1">${item.year} | ${item.platform}</p>
+                    <div class="flex justify-between text-[10px] font-bold uppercase tracking-wider">
+                        <span class="text-purple-400">${item.status || 'Not Played'}</span>
+                        <span class="text-yellow-400">Wishlisted</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+    container.innerHTML = html;
+}
+
+// --- NEW: Navigation Helpers ---
+function openWishlist() {
+    state.view = 'wishlist';
+    loadLibrary();
+}
+
+function goHome() {
+    state.view = 'franchises';
+    state.activeFranchiseId = null;
+    state.activeSubId = null;
+    state.activeCategory = null;
+    loadLibrary();
+}
 // 5. Navigation Actions
 function openMainGames(franchiseId) {
     state.view = 'mainGames';
@@ -232,16 +337,51 @@ function toggleSubBranch(gameId, category) {
     }
     loadLibrary();
 }
+// --- NEW: The Delete Function ---
+function deleteGame(gameId) {
+    // 1. Ask for confirmation so you don't accidentally delete something!
+    if (!confirm("Are you sure you want to delete this game from the vault?")) {
+        return; 
+    }
 
+    // 2. Open the vault
+    let vaultData = JSON.parse(localStorage.getItem('myVaultData'));
+
+    // 3. Hunt down the game and filter it out
+    vaultData.franchises.forEach(franchise => {
+        if (franchise.mainGames) {
+            // Remove it if it's a Main Game
+            franchise.mainGames = franchise.mainGames.filter(g => g.id !== gameId);
+            
+            // Check inside the sub-branches of the remaining main games
+            franchise.mainGames.forEach(game => {
+                if (game.ports) game.ports = game.ports.filter(p => p.id !== gameId);
+                if (game.remakes) game.remakes = game.remakes.filter(r => r.id !== gameId);
+                if (game.sequels) game.sequels = game.sequels.filter(s => s.id !== gameId);
+            });
+        }
+    });
+
+    // 4. Save the newly cleaned vault and redraw the screen
+    localStorage.setItem('myVaultData', JSON.stringify(vaultData));
+    loadLibrary();
+}
 /// ==========================================
-// --- NEW: MODAL & DYNAMIC FORM LOGIC ---
+// --- MODAL & DYNAMIC FORM LOGIC ---
 // ==========================================
 
 function openModal() {
-    // 1. Show the window
+    state.editingGameId = null; // We are ADDING, not editing
+    document.querySelector('#addModal h2').innerText = "Add New Entry";
+    
+    // Ensure all dropdowns are enabled
+    document.getElementById('gFranchise').disabled = false;
+    document.getElementById('gCategory').disabled = false;
+    document.getElementById('gParent').disabled = false;
+    document.querySelector('input[name="entryType"][value="franchise"]').disabled = false;
+
     document.getElementById('addModal').classList.remove('hidden');
     
-    // 2. Magically populate the "Target Franchise" dropdown
     let vaultData = JSON.parse(localStorage.getItem('myVaultData'));
     const franchiseSelect = document.getElementById('gFranchise');
     if (franchiseSelect && vaultData) {
@@ -253,13 +393,11 @@ function openModal() {
 }
 
 function closeModal() {
-    // Hide the window and clear out the old typing
     document.getElementById('addModal').classList.add('hidden');
     document.getElementById('universalForm').reset(); 
     toggleFormFields(); 
 }
 
-// This is the magic toggle switch!
 function toggleFormFields() {
     const isGame = document.querySelector('input[name="entryType"]:checked').value === 'game';
     const gameFields = document.getElementById('gameFields');
@@ -274,18 +412,62 @@ function toggleFormFields() {
     }
 }
 
-// Handling the "Save to Vault" click
+// --- NEW: The Editor Function ---
+function openEditModal(gameId) {
+    let vaultData = JSON.parse(localStorage.getItem('myVaultData'));
+    let targetGame = null;
+
+    // Hunt down the specific game in the tree
+    vaultData.franchises.forEach(f => {
+        if (f.mainGames) {
+            f.mainGames.forEach(g => {
+                if (g.id === gameId) targetGame = g;
+                if (g.ports) g.ports.forEach(p => { if (p.id === gameId) targetGame = p; });
+                if (g.remakes) g.remakes.forEach(r => { if (r.id === gameId) targetGame = r; });
+                if (g.sequels) g.sequels.forEach(s => { if (s.id === gameId) targetGame = s; });
+            });
+        }
+    });
+
+    if (!targetGame) return;
+
+    state.editingGameId = gameId; // Set the tracker!
+    
+    // Open modal and force it to the Game view
+    document.getElementById('addModal').classList.remove('hidden');
+    document.querySelector('input[name="entryType"][value="game"]').checked = true;
+    document.querySelector('input[name="entryType"][value="franchise"]').disabled = true; // Lock out franchise tab
+    toggleFormFields();
+
+    // Pre-fill all the text fields with the game's data
+    document.getElementById('gTitle').value = targetGame.title;
+    document.getElementById('gYear').value = targetGame.year;
+    document.getElementById('gPlatform').value = targetGame.platform;
+    document.getElementById('gScore').value = targetGame.score !== '-' ? targetGame.score : '';
+    document.getElementById('gDev').value = targetGame.developer !== 'Unknown' ? targetGame.developer : '';
+    document.getElementById('gPlayStatus').value = targetGame.status || 'Not Played';
+    document.getElementById('gOwnership').value = targetGame.ownership || 'Not Owned';
+    
+    let cover = targetGame.coverImg;
+    document.getElementById('gCover').value = cover.includes('placehold.co') ? '' : cover;
+
+    // Change title and lock structural dropdowns (so we don't accidentally move branches while editing)
+    document.querySelector('#addModal h2').innerText = "Edit Game";
+    document.getElementById('gFranchise').disabled = true;
+    document.getElementById('gCategory').disabled = true;
+    document.getElementById('gParent').disabled = true;
+}
+
+// Handling the Save / Update Click
 const universalForm = document.getElementById('universalForm');
 if (universalForm) {
     universalForm.addEventListener('submit', function(e) {
         e.preventDefault();
-        
-        // Find out what we are saving
         const type = document.querySelector('input[name="entryType"]:checked').value;
         let vaultData = JSON.parse(localStorage.getItem('myVaultData'));
 
         if (type === 'franchise') {
-            // === SAVE A FRANCHISE ===
+            // === SAVE A NEW FRANCHISE ===
             const name = document.getElementById('fTitle').value;
             let cover = document.getElementById('fCover').value;
             if (!cover) cover = 'https://placehold.co/400x600?text=' + name.replace(/ /g, '+');
@@ -299,48 +481,76 @@ if (universalForm) {
             vaultData.franchises.push(newFranchise);
 
         } else {
-           // === SAVE A GAME ===
-           const tFranchiseId = document.getElementById('gFranchise').value;
-           const category = document.getElementById('gCategory').value;
-           const title = document.getElementById('gTitle').value;
-           const year = parseInt(document.getElementById('gYear').value) || 0;
-           const platform = document.getElementById('gPlatform').value;
-           const score = document.getElementById('gScore').value || '-';
-           const dev = document.getElementById('gDev').value || 'Unknown';
-           const parentId = document.getElementById('gParent').value;
-           
-           // Grab the custom cover url from the form!
-           let customCover = document.getElementById('gCover').value;
-           // Use the custom one if provided, otherwise generate a placeholder
-           let finalCover = customCover ? customCover : 'https://placehold.co/160x214?text=' + title.replace(/ /g, '+');
+            // === GRAB GAME DATA ===
+            const tFranchiseId = document.getElementById('gFranchise').value;
+            const category = document.getElementById('gCategory').value;
+            const title = document.getElementById('gTitle').value;
+            const year = parseInt(document.getElementById('gYear').value) || 0;
+            const platform = document.getElementById('gPlatform').value;
+            const score = document.getElementById('gScore').value || '-';
+            const dev = document.getElementById('gDev').value || 'Unknown';
+            const parentId = document.getElementById('gParent').value;
+            const playStatus = document.getElementById('gPlayStatus').value;
+            const ownership = document.getElementById('gOwnership').value;
+            
+            let customCover = document.getElementById('gCover').value;
+            let finalCover = customCover ? customCover : 'https://placehold.co/160x214?text=' + title.replace(/ /g, '+');
 
-           const newGame = {
-               id: 'game-' + Date.now(),
-               title: title,
-               year: year,
-               platform: platform,
-               developer: dev, 
-               score: score,   
-               status: "Not Played",
-               coverImg: finalCover // <--- Saves the image here!
-           };
-            let franchise = vaultData.franchises.find(f => f.id === tFranchiseId);
+            if (state.editingGameId) {
+                // === UPDATE AN EXISTING GAME ===
+                const updateGameObject = (game) => {
+                    game.title = title;
+                    game.year = year;
+                    game.platform = platform;
+                    game.score = score;
+                    game.developer = dev;
+                    game.status = playStatus;
+                    game.ownership = ownership;
+                    game.coverImg = finalCover;
+                };
 
-            if (category === 'mainGames') {
-                franchise.mainGames.push(newGame);
+                vaultData.franchises.forEach(f => {
+                    if (f.mainGames) {
+                        f.mainGames.forEach(g => {
+                            if (g.id === state.editingGameId) updateGameObject(g);
+                            if (g.ports) g.ports.forEach(p => { if (p.id === state.editingGameId) updateGameObject(p); });
+                            if (g.remakes) g.remakes.forEach(r => { if (r.id === state.editingGameId) updateGameObject(r); });
+                            if (g.sequels) g.sequels.forEach(s => { if (s.id === state.editingGameId) updateGameObject(s); });
+                        });
+                    }
+                });
+
             } else {
-                let parentGame = franchise.mainGames.find(g => g.id === parentId);
-                if (parentGame) {
-                    if (!parentGame[category]) parentGame[category] = [];
-                    parentGame[category].push(newGame);
+                // === ADD A BRAND NEW GAME ===
+                const newGame = {
+                    id: 'game-' + Date.now(),
+                    title: title,
+                    year: year,
+                    platform: platform,
+                    developer: dev, 
+                    score: score,   
+                    status: playStatus, 
+                    ownership: ownership, 
+                    coverImg: finalCover 
+                };
+
+                let franchise = vaultData.franchises.find(f => f.id === tFranchiseId);
+
+                if (category === 'mainGames') {
+                    franchise.mainGames.push(newGame);
                 } else {
-                    alert("Please select an 'Attach To' parent game!");
-                    return;
+                    let parentGame = franchise.mainGames.find(g => g.id === parentId);
+                    if (parentGame) {
+                        if (!parentGame[category]) parentGame[category] = [];
+                        parentGame[category].push(newGame);
+                    } else {
+                        alert("Please select an 'Attach To' parent game!");
+                        return;
+                    }
                 }
             }
         }
 
-        // Save everything, close the window, and redraw the screen
         localStorage.setItem('myVaultData', JSON.stringify(vaultData));
         closeModal();
         loadLibrary();
