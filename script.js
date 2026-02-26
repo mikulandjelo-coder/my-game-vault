@@ -104,31 +104,31 @@ function renderMainGames(games, container) {
     
     games.forEach(game => {
         gamesHTML += `
-            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow flex flex-col relative hover:border-gray-500 transition">
-                
-                <div class="absolute top-2 left-2 flex gap-1 z-20">
-                    <button onclick="deleteGame('${game.id}')" title="Delete" class="bg-gray-800/90 hover:bg-gray-600 text-white w-7 h-7 rounded-full flex items-center justify-center transition border border-gray-600 shadow-md text-xs">🗑️</button>
-                    <button onclick="openEditModal('${game.id}')" title="Edit" class="bg-gray-800/90 hover:bg-gray-600 text-white w-7 h-7 rounded-full flex items-center justify-center transition border border-gray-600 shadow-md text-xs">✏️</button>
-                </div>
+        <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow flex flex-col relative hover:border-gray-500 transition">
+            
+            <div class="absolute top-2 left-2 flex gap-1 z-20">
+                <button onclick="deleteGame('${game.id}')" title="Delete" class="bg-gray-800/90 hover:bg-gray-600 text-white w-7 h-7 rounded-full flex items-center justify-center transition border border-gray-600 shadow-md text-xs">🗑️</button>
+                <button onclick="openEditModal('${game.id}')" title="Edit" class="bg-gray-800/90 hover:bg-gray-600 text-white w-7 h-7 rounded-full flex items-center justify-center transition border border-gray-600 shadow-md text-xs">✏️</button>
+            </div>
 
-                <img src="${game.coverImg}" class="w-full aspect-[80/107] object-cover rounded mb-3 shadow-md">
-                <h3 class="font-bold text-lg text-white leading-tight mb-1">${game.title}</h3>
-                
-                <div class="mt-auto pt-2 border-t border-gray-700 mb-3">
-                    <p class="text-gray-400 text-xs mb-1">${game.year} | <span class="text-gray-300 font-semibold">${game.platform}</span></p>
-                    <div class="flex justify-between text-[10px] font-bold uppercase tracking-wider">
-                        <span class="${getStatusColor(game.status)}">${game.status || 'Not Played'}</span>
-                        <span class="text-yellow-500">Score: ${game.score || '-'}</span>
-                    </div>
-                </div>
-                
-                <div class="flex flex-wrap gap-2 mt-auto">
-                    <button onclick="toggleSubBranch('${game.id}', 'ports')" class="text-[10px] bg-gray-700 px-2 py-1 rounded hover:bg-purple-500 text-white transition">Ports</button>
-                    <button onclick="toggleSubBranch('${game.id}', 'remakes')" class="text-[10px] bg-gray-700 px-2 py-1 rounded hover:bg-purple-500 text-white transition">Remakes</button>
-                    <button onclick="toggleSubBranch('${game.id}', 'sequels')" class="text-[10px] bg-gray-700 px-2 py-1 rounded hover:bg-purple-500 text-white transition">Sequels</button>
+            <img src="${game.coverImg}" onclick="openGameDetails('${game.id}')" class="w-full aspect-[80/107] object-cover rounded mb-3 shadow-md cursor-pointer hover:opacity-80 transition" title="Click for details">
+            
+            <h3 class="font-bold text-lg text-white leading-tight mb-1">${game.title}</h3>
+            
+            <div class="mt-auto pt-2 border-t border-gray-700 mb-3">
+                <p class="text-gray-400 text-xs mb-1">${game.year} | <span class="text-gray-300 font-semibold">${game.platform}</span></p>
+                <div class="flex justify-between text-[10px] font-bold uppercase tracking-wider">
+                    <span class="${getStatusColor(game.status)}">${game.status || 'Not Played'}</span>
                 </div>
             </div>
-        `;
+            
+            <div class="flex flex-wrap gap-2 mt-auto">
+                <button onclick="toggleSubBranch('${game.id}', 'ports')" class="text-[10px] bg-gray-700 px-2 py-1 rounded hover:bg-purple-500 text-white transition">Ports</button>
+                <button onclick="toggleSubBranch('${game.id}', 'remakes')" class="text-[10px] bg-gray-700 px-2 py-1 rounded hover:bg-purple-500 text-white transition">Remakes</button>
+                <button onclick="toggleSubBranch('${game.id}', 'sequels')" class="text-[10px] bg-gray-700 px-2 py-1 rounded hover:bg-purple-500 text-white transition">Sequels</button>
+            </div>
+        </div>
+    `;
 
         if (state.activeSubId === game.id && game[state.activeCategory]) {
             gamesHTML += renderSubBranch(game[state.activeCategory], state.activeCategory);
@@ -147,13 +147,12 @@ function renderSubBranch(itemsList, categoryName) {
     itemsList.forEach(item => {
         subHTML += `
             <div class="bg-gray-700 p-3 rounded-lg flex gap-4 border border-gray-600 shadow-inner">
-                <img src="${item.coverImg}" class="w-16 aspect-[80/107] object-cover rounded shadow-sm">
+                <img src="${item.coverImg}" onclick="openGameDetails('${item.id}')" class="w-16 aspect-[80/107] object-cover rounded shadow-sm cursor-pointer hover:opacity-80 transition" title="Click for details">
                 <div class="flex flex-col justify-center">
                     <h4 class="font-bold text-white text-sm mb-1">${item.title} (${item.year})</h4>
                     <p class="text-gray-300 text-xs font-bold mb-3">${item.platform}</p>
                     <div class="flex gap-2">
                         <span class="bg-gray-900 text-xs px-2 py-1 rounded text-gray-300 border border-gray-600">Status: ${item.status || 'N/A'}</span>
-                        <span class="bg-gray-900 text-xs px-2 py-1 rounded text-white font-bold border border-gray-600">Score: ${item.score || '-'}</span>
                     </div>
                 </div>
             </div>
@@ -195,21 +194,22 @@ function renderAllGames(franchise, container) {
                     <button onclick="deleteGame('${item.id}')" title="Delete" class="bg-gray-800/90 hover:bg-gray-600 text-white w-7 h-7 rounded-full flex items-center justify-center transition border border-gray-600 shadow-md text-xs">🗑️</button>
                     <button onclick="openEditModal('${item.id}')" title="Edit" class="bg-gray-800/90 hover:bg-gray-600 text-white w-7 h-7 rounded-full flex items-center justify-center transition border border-gray-600 shadow-md text-xs">✏️</button>
                 </div>
-<span class="absolute top-2 right-2 ${badgeColor} text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg z-10">${item.type}</span>
-                <img src="${item.coverImg}" class="w-full aspect-[80/107] object-cover rounded mb-3 shadow-md">
+
+                <span class="absolute top-2 right-2 ${badgeColor} text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg z-10">${item.type}</span>
+
+                <img src="${item.coverImg}" onclick="openGameDetails('${item.id}')" class="w-full aspect-[80/107] object-cover rounded mb-3 shadow-md cursor-pointer hover:opacity-80 transition" title="Click for details">
+                
                 <h3 class="font-bold text-lg text-white leading-tight mb-1">${item.title}</h3>
                 
                 <div class="mt-auto pt-2 border-t border-gray-700 mb-3">
                     <p class="text-gray-400 text-xs mb-1">${item.year} | <span class="text-gray-300 font-semibold">${item.platform}</span></p>
                     <div class="flex justify-between text-[10px] font-bold uppercase tracking-wider">
                         <span class="${getStatusColor(item.status)}">${item.status || 'Not Played'}</span>
-                        <span class="text-yellow-500">Score: ${item.score || '-'}</span>
                     </div>
                 </div>
             </div>
         `;
     });
-
     html += `</div>`;
     container.innerHTML += html;
 }
@@ -284,15 +284,21 @@ function renderWishlist(franchises, container) {
                 <button onclick="openEditModal('${item.id}')" title="Edit" class="bg-gray-800/90 hover:bg-gray-600 text-white w-7 h-7 rounded-full flex items-center justify-center transition border border-gray-600 shadow-md text-xs">✏️</button>
             </div>
 
-            <img src="${item.coverImg}" class="w-full aspect-[80/107] object-cover rounded mb-3 shadow-md">
+            <img src="${item.coverImg}" onclick="openGameDetails('${item.id}')" class="w-full aspect-[80/107] object-cover rounded mb-3 shadow-md cursor-pointer hover:opacity-80 transition" title="Click for details">
+            
             <h3 class="font-bold text-lg text-white leading-tight mb-1">${item.title}</h3>
             
             <div class="mt-auto pt-2 border-t border-gray-700 mb-3">
                 <p class="text-gray-400 text-xs mb-1">${item.year} | <span class="text-gray-300 font-semibold">${item.platform}</span></p>
                 <div class="flex justify-between text-[10px] font-bold uppercase tracking-wider">
                     <span class="${getStatusColor(item.status)}">${item.status || 'Not Played'}</span>
-                    <span class="text-yellow-500">Score: ${item.score || '-'}</span>
                 </div>
+            </div>
+            
+            <div class="flex flex-wrap gap-2 mt-auto">
+                <button onclick="toggleSubBranch('${item.id}', 'ports')" class="text-[10px] bg-gray-700 px-2 py-1 rounded hover:bg-purple-500 text-white transition">Ports</button>
+                <button onclick="toggleSubBranch('${item.id}', 'remakes')" class="text-[10px] bg-gray-700 px-2 py-1 rounded hover:bg-purple-500 text-white transition">Remakes</button>
+                <button onclick="toggleSubBranch('${item.id}', 'sequels')" class="text-[10px] bg-gray-700 px-2 py-1 rounded hover:bg-purple-500 text-white transition">Sequels</button>
             </div>
         </div>
     `;
@@ -526,7 +532,48 @@ function toggleFormFields() {
         franchiseFields.classList.remove('hidden');
     }
 }
+// --- NEW: Game Details Zoom View ---
+function openGameDetails(gameId) {
+    let vaultData = JSON.parse(localStorage.getItem('myVaultData'));
+    let targetGame = null;
+    let targetFranchiseName = "";
 
+    // Hunt down the game and note its Franchise
+    vaultData.franchises.forEach(f => {
+        if (f.mainGames) {
+            f.mainGames.forEach(g => {
+                if (g.id === gameId) { targetGame = g; targetFranchiseName = f.name; }
+                if (g.ports) g.ports.forEach(p => { if (p.id === gameId) { targetGame = p; targetFranchiseName = f.name; }});
+                if (g.remakes) g.remakes.forEach(r => { if (r.id === gameId) { targetGame = r; targetFranchiseName = f.name; }});
+                if (g.sequels) g.sequels.forEach(s => { if (s.id === gameId) { targetGame = s; targetFranchiseName = f.name; }});
+            });
+        }
+    });
+
+    if (!targetGame) return;
+
+    // Fill the UI
+    document.getElementById('dCover').src = targetGame.coverImg;
+    document.getElementById('dFranchise').innerText = targetFranchiseName;
+    document.getElementById('dTitle').innerText = targetGame.title;
+    document.getElementById('dYear').innerText = targetGame.year;
+    document.getElementById('dPlatform').innerText = targetGame.platform;
+    document.getElementById('dGenre').innerText = targetGame.genre || 'Unknown';
+    document.getElementById('dDev').innerText = targetGame.developer || 'Unknown';
+    document.getElementById('dOwnership').innerText = targetGame.ownership || 'Not Owned';
+    document.getElementById('dScore').innerText = targetGame.score || '-';
+    
+    let statusEl = document.getElementById('dStatus');
+    statusEl.innerText = targetGame.status || 'Not Played';
+    statusEl.className = `font-bold text-sm ${getStatusColor(targetGame.status)}`;
+
+    // Show it!
+    document.getElementById('detailsModal').classList.remove('hidden');
+}
+
+function closeDetailsModal() {
+    document.getElementById('detailsModal').classList.add('hidden');
+}
 // --- The Editor Function ---
 function openEditModal(gameId) {
     let vaultData = JSON.parse(localStorage.getItem('myVaultData'));
@@ -557,6 +604,7 @@ function openEditModal(gameId) {
     document.getElementById('gPlatform').value = targetGame.platform;
     document.getElementById('gScore').value = targetGame.score !== '-' ? targetGame.score : '';
     document.getElementById('gDev').value = targetGame.developer !== 'Unknown' ? targetGame.developer : '';
+    document.getElementById('gGenre').value = targetGame.genre || '';
     document.getElementById('gPlayStatus').value = targetGame.status || 'Not Played';
     document.getElementById('gOwnership').value = targetGame.ownership || 'Not Owned';
     
@@ -603,6 +651,7 @@ if (universalForm) {
             const platform = document.getElementById('gPlatform').value;
             const score = document.getElementById('gScore').value || '-';
             const dev = document.getElementById('gDev').value || 'Unknown';
+            const genre = document.getElementById('gGenre').value || 'Unknown'; // <-- NEW
             const parentId = document.getElementById('gParent').value;
             const playStatus = document.getElementById('gPlayStatus').value;
             const ownership = document.getElementById('gOwnership').value;
@@ -617,6 +666,7 @@ if (universalForm) {
                     game.platform = platform;
                     game.score = score;
                     game.developer = dev;
+                    game.genre = genre;
                     game.status = playStatus;
                     game.ownership = ownership;
                     game.coverImg = finalCover;
@@ -639,7 +689,8 @@ if (universalForm) {
                     title: title,
                     year: year,
                     platform: platform,
-                    developer: dev, 
+                    developer: dev,
+                    genre: genre, 
                     score: score,   
                     status: playStatus, 
                     ownership: ownership, 
