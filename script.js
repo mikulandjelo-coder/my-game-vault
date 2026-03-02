@@ -54,48 +54,52 @@ async function loadLibrary() {
         renderAllGames(franchise, container); 
     } else if (state.view === 'wishlist') {
         renderWishlist(vaultData.franchises, container); 
+    } else if (state.view === 'globalAllGames') {
+        renderGlobalAllGames(vaultData.franchises, container);
     }
 }
 
-// 2. Render Layer 1 (Franchise)
+// 2. Render Layer 1 (Franchise Grid)
 function renderFranchises(franchises, container) {
+    // NEW: Wrap the franchises in a 3-column grid!
+    let html = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12 w-full mt-4">`;
+    
     franchises.forEach(franchise => {
         let realPercentage = calculateExploredPercentage(franchise);
 
         let buttonsHtml = state.view === 'franchises' 
-            ? `<button onclick="openMainGames('${franchise.id}')" class="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded font-bold shadow transition">Main Games</button>
-               <button onclick="openAllGames('${franchise.id}')" class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded font-bold shadow transition">All Games</button>`
-            : `<button onclick="goBack()" class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded font-bold shadow transition">← Close Branch</button>`;
+            ? `<button onclick="openMainGames('${franchise.id}')" class="bg-purple-600 hover:bg-purple-500 text-white text-xs px-4 py-2 rounded font-bold shadow transition w-full">Main Games</button>
+               <button onclick="openAllGames('${franchise.id}')" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-4 py-2 rounded font-bold shadow transition w-full">Branch View</button>`
+            : `<button onclick="goBack()" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-4 py-2 rounded font-bold shadow transition w-full">← Close Branch</button>`;
 
-            container.innerHTML += `
-            <div class="bg-gray-800 rounded-xl border border-gray-700 flex flex-col md:flex-row overflow-hidden shadow-lg mb-4 hover:border-gray-500 transition">
+        // The new vertical, compact card layout
+        html += `
+            <div class="bg-gray-800 rounded-xl border border-gray-700 flex flex-col overflow-hidden shadow-lg relative hover:border-gray-500 transition">
                 
-                <div class="p-6 flex-1 flex flex-col justify-between">
-                    <div>
-                        <div class="flex justify-between items-start mb-4 gap-4">
-                            <h2 class="text-4xl font-bold text-white break-words">${franchise.name}</h2>
-                            <div class="flex gap-2 shrink-0">
-                                <button onclick="deleteFranchise('${franchise.id}')" title="Delete Franchise" class="bg-gray-700 hover:bg-gray-600 text-white w-8 h-8 rounded flex items-center justify-center transition border border-gray-600 shadow-md text-sm">🗑️</button>
-                                <button onclick="openFranchiseEdit('${franchise.id}')" title="Edit Franchise" class="bg-gray-700 hover:bg-gray-600 text-white w-8 h-8 rounded flex items-center justify-center transition border border-gray-600 shadow-md text-sm">✏️</button>
-                            </div>
-                        </div>
+                <div class="absolute top-2 left-2 flex gap-1 z-20">
+                    <button onclick="deleteFranchise('${franchise.id}')" title="Delete Franchise" class="bg-gray-900/80 hover:bg-red-600 text-white w-7 h-7 rounded flex items-center justify-center transition border border-gray-600 shadow-md text-xs">🗑️</button>
+                    <button onclick="openFranchiseEdit('${franchise.id}')" title="Edit Franchise" class="bg-gray-900/80 hover:bg-blue-600 text-white w-7 h-7 rounded flex items-center justify-center transition border border-gray-600 shadow-md text-xs">✏️</button>
+                </div>
 
-                        <div class="flex items-center gap-3 mb-4">
-                            <div class="w-14 h-14 rounded-full border-4 border-green-500 flex items-center justify-center text-lg font-bold">${realPercentage}%</div>
-                            <span class="text-gray-400 font-semibold uppercase tracking-wider text-sm">Explored</span>
-                        </div>
-                    </div>
-                    <div class="flex gap-4 mt-8">
-                        ${buttonsHtml}
+                <div class="h-48 w-full bg-gray-900 border-b border-gray-700 relative">
+                    <img src="${franchise.coverImg}" class="w-full h-full object-cover opacity-90 hover:opacity-100 transition">
+                    <div class="absolute bottom-2 right-2 bg-gray-900/90 border-2 border-green-500 rounded-full w-12 h-12 flex items-center justify-center text-white font-bold shadow-lg text-xs">
+                        ${realPercentage}%
                     </div>
                 </div>
 
-                <div class="w-full md:w-[200px] lg:w-[240px] flex-shrink-0 bg-gray-900 border-t md:border-t-0 md:border-l border-gray-700">
-                    <img src="${franchise.coverImg}" class="w-full h-full object-cover aspect-[80/107] opacity-90 hover:opacity-100 transition">
+                <div class="p-4 flex flex-col flex-1 justify-between">
+                    <h2 class="text-2xl font-bold text-white mb-4 text-center truncate" title="${franchise.name}">${franchise.name}</h2>
+                    <div class="flex gap-2 mt-auto">
+                        ${buttonsHtml}
+                    </div>
                 </div>
             </div>
         `;
     });
+    
+    html += `</div>`;
+    container.innerHTML += html;
 }
 
 // 3. Render Layer 2 (Main Games Branch)
@@ -103,32 +107,37 @@ function renderMainGames(games, container) {
     let gamesHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4 pl-4 border-l-4 border-purple-600 ml-8 mb-12">`;
     
     games.forEach(game => {
-        gamesHTML += `
-        <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow flex flex-col relative hover:border-gray-500 transition">
-            
-            <div class="absolute top-2 left-2 flex gap-1 z-20">
-                <button onclick="deleteGame('${game.id}')" title="Delete" class="bg-gray-800/90 hover:bg-gray-600 text-white w-7 h-7 rounded-full flex items-center justify-center transition border border-gray-600 shadow-md text-xs">🗑️</button>
-                <button onclick="openEditModal('${game.id}')" title="Edit" class="bg-gray-800/90 hover:bg-gray-600 text-white w-7 h-7 rounded-full flex items-center justify-center transition border border-gray-600 shadow-md text-xs">✏️</button>
-            </div>
+        // NEW: Smart Conditional Buttons! Only show if they exist and have length > 0
+        let portsBtn = (game.ports && game.ports.length > 0) ? `<button onclick="toggleSubBranch('${game.id}', 'ports')" class="text-[10px] bg-gray-700 px-2 py-1 rounded hover:bg-green-500 text-white transition border border-gray-600">Ports (${game.ports.length})</button>` : '';
+        let remakesBtn = (game.remakes && game.remakes.length > 0) ? `<button onclick="toggleSubBranch('${game.id}', 'remakes')" class="text-[10px] bg-gray-700 px-2 py-1 rounded hover:bg-blue-500 text-white transition border border-gray-600">Remakes (${game.remakes.length})</button>` : '';
+        let sequelsBtn = (game.sequels && game.sequels.length > 0) ? `<button onclick="toggleSubBranch('${game.id}', 'sequels')" class="text-[10px] bg-gray-700 px-2 py-1 rounded hover:bg-yellow-500 text-white transition border border-gray-600">Sequels (${game.sequels.length})</button>` : '';
 
-            <img src="${game.coverImg}" onclick="openGameDetails('${game.id}')" class="w-full aspect-[80/107] object-cover rounded mb-3 shadow-md cursor-pointer hover:opacity-80 transition" title="Click for details">
-            
-            <h3 class="font-bold text-lg text-white leading-tight mb-1">${game.title}</h3>
-            
-            <div class="mt-auto pt-2 border-t border-gray-700 mb-3">
-                <p class="text-gray-400 text-xs mb-1">${game.year} | <span class="text-gray-300 font-semibold">${game.platform}</span></p>
-                <div class="flex justify-between text-[10px] font-bold uppercase tracking-wider">
-                    <span class="${getStatusColor(game.status)}">${game.status || 'Not Played'}</span>
+        gamesHTML += `
+            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow flex flex-col relative hover:border-gray-500 transition">
+                
+                <div class="absolute top-2 left-2 flex gap-1 z-20">
+                    <button onclick="deleteGame('${game.id}')" title="Delete" class="bg-gray-800/90 hover:bg-gray-600 text-white w-7 h-7 rounded-full flex items-center justify-center transition border border-gray-600 shadow-md text-xs">🗑️</button>
+                    <button onclick="openEditModal('${game.id}')" title="Edit" class="bg-gray-800/90 hover:bg-gray-600 text-white w-7 h-7 rounded-full flex items-center justify-center transition border border-gray-600 shadow-md text-xs">✏️</button>
+                </div>
+
+                <img src="${game.coverImg}" onclick="openGameDetails('${game.id}')" class="w-full aspect-[80/107] object-cover rounded mb-3 shadow-md cursor-pointer hover:opacity-80 transition" title="Click for details">
+                
+                <h3 class="font-bold text-lg text-white leading-tight mb-1">${game.title}</h3>
+                
+                <div class="mt-auto pt-2 border-t border-gray-700 mb-3">
+                    <p class="text-gray-400 text-xs mb-1">${game.year} | <span class="text-gray-300 font-semibold">${game.platform}</span></p>
+                    <div class="flex justify-between text-[10px] font-bold uppercase tracking-wider">
+                        <span class="${getStatusColor(game.status)}">${game.status || 'Not Played'}</span>
+                    </div>
+                </div>
+                
+                <div class="flex flex-wrap gap-2 mt-auto">
+                    ${portsBtn}
+                    ${remakesBtn}
+                    ${sequelsBtn}
                 </div>
             </div>
-            
-            <div class="flex flex-wrap gap-2 mt-auto">
-                <button onclick="toggleSubBranch('${game.id}', 'ports')" class="text-[10px] bg-gray-700 px-2 py-1 rounded hover:bg-purple-500 text-white transition">Ports</button>
-                <button onclick="toggleSubBranch('${game.id}', 'remakes')" class="text-[10px] bg-gray-700 px-2 py-1 rounded hover:bg-purple-500 text-white transition">Remakes</button>
-                <button onclick="toggleSubBranch('${game.id}', 'sequels')" class="text-[10px] bg-gray-700 px-2 py-1 rounded hover:bg-purple-500 text-white transition">Sequels</button>
-            </div>
-        </div>
-    `;
+        `;
 
         if (state.activeSubId === game.id && game[state.activeCategory]) {
             gamesHTML += renderSubBranch(game[state.activeCategory], state.activeCategory);
@@ -306,6 +315,177 @@ function renderWishlist(franchises, container) {
 
     html += `</div>`;
     container.innerHTML = html;
+}
+// --- NEW: Global All Games View (Dashboard & Grid) ---
+function openGlobalAllGames() {
+    state.view = 'globalAllGames';
+    loadLibrary();
+}
+
+function renderGlobalAllGames(franchises, container) {
+    // 1. Gather EVERY game in the vault and store it globally for the filter engine
+    window.masterGamesList = [];
+    franchises.forEach(f => {
+        if (f.mainGames) {
+            f.mainGames.forEach(g => {
+                window.masterGamesList.push({...g, franchiseName: f.name, type: 'Main Game'});
+                if (g.ports) g.ports.forEach(p => window.masterGamesList.push({...p, franchiseName: f.name, type: 'Port'}));
+                if (g.remakes) g.remakes.forEach(r => window.masterGamesList.push({...r, franchiseName: f.name, type: 'Remake'}));
+                if (g.sequels) g.sequels.forEach(s => window.masterGamesList.push({...s, franchiseName: f.name, type: 'Sequel'}));
+            });
+        }
+    });
+
+    // 2. Extract unique, sorted lists for the dropdowns automatically
+    const platforms = [...new Set(window.masterGamesList.map(g => g.platform).filter(Boolean))].sort();
+    const years = [...new Set(window.masterGamesList.map(g => g.year).filter(Boolean))].sort((a, b) => b - a);
+    const franchiseNames = [...new Set(window.masterGamesList.map(g => g.franchiseName))].sort();
+
+    // 3. Build the Header & Filter Dashboard HTML
+    let html = `
+        <div class="mb-6 flex justify-between items-center mt-4 border-b border-gray-700 pb-4">
+            <h2 class="text-3xl font-bold text-blue-500 flex items-center gap-2">🌍 Entire Collection <span id="gameCountBadge" class="text-gray-500 text-lg">(${window.masterGamesList.length} games)</span></h2>
+            <button onclick="goHome()" class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded font-bold shadow transition">← Back to Franchises</button>
+        </div>
+        
+        <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-8 shadow-lg">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                
+                <div>
+                    <label class="block text-[10px] text-gray-400 mb-1 font-bold uppercase tracking-wider">Franchise</label>
+                    <select id="filterFranchise" onchange="applyGlobalFilters()" class="w-full bg-gray-900 text-white rounded p-2 outline-none border border-gray-600 text-sm focus:border-blue-500 cursor-pointer">
+                        <option value="All">All Franchises</option>
+                        ${franchiseNames.map(f => `<option value="${f}">${f}</option>`).join('')}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] text-gray-400 mb-1 font-bold uppercase tracking-wider">Platform</label>
+                    <select id="filterPlatform" onchange="applyGlobalFilters()" class="w-full bg-gray-900 text-white rounded p-2 outline-none border border-gray-600 text-sm focus:border-blue-500 cursor-pointer">
+                        <option value="All">All Platforms</option>
+                        ${platforms.map(p => `<option value="${p}">${p}</option>`).join('')}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] text-gray-400 mb-1 font-bold uppercase tracking-wider">Release Year</label>
+                    <select id="filterYear" onchange="applyGlobalFilters()" class="w-full bg-gray-900 text-white rounded p-2 outline-none border border-gray-600 text-sm focus:border-blue-500 cursor-pointer">
+                        <option value="All">All Years</option>
+                        ${years.map(y => `<option value="${y}">${y}</option>`).join('')}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] text-gray-400 mb-1 font-bold uppercase tracking-wider">Score</label>
+                    <select id="filterScore" onchange="applyGlobalFilters()" class="w-full bg-gray-900 text-white rounded p-2 outline-none border border-gray-600 text-sm focus:border-blue-500 cursor-pointer">
+                        <option value="All">All Scores</option>
+                        <option value="90">90 - 100 (Masterpiece)</option>
+                        <option value="80">80 - 89 (Great)</option>
+                        <option value="70">70 - 79 (Good)</option>
+                        <option value="unscored">Unscored</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] text-blue-400 mb-1 font-bold uppercase tracking-wider">Sort By</label>
+                    <select id="sortOptions" onchange="applyGlobalFilters()" class="w-full bg-gray-900 text-blue-400 rounded p-2 outline-none border border-blue-600 text-sm focus:border-blue-400 cursor-pointer font-bold">
+                        <option value="yearDesc">Year (Newest First)</option>
+                        <option value="yearAsc">Year (Oldest First)</option>
+                        <option value="scoreDesc">Score (Highest First)</option>
+                        <option value="scoreAsc">Score (Lowest First)</option>
+                    </select>
+                </div>
+
+            </div>
+        </div>
+
+        <div id="allGamesGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-12"></div>
+    `;
+
+    container.innerHTML = html;
+    
+    // 4. Trigger the first render to populate the grid
+    applyGlobalFilters();
+}
+
+function applyGlobalFilters() {
+    // 1. Read what the user selected in the dashboard
+    const fFranchise = document.getElementById('filterFranchise').value;
+    const fPlatform = document.getElementById('filterPlatform').value;
+    const fYear = document.getElementById('filterYear').value;
+    const fScore = document.getElementById('filterScore').value;
+    const sortVal = document.getElementById('sortOptions').value;
+
+    // 2. Filter the master list
+    let filtered = window.masterGamesList.filter(g => {
+        if (fFranchise !== 'All' && g.franchiseName !== fFranchise) return false;
+        if (fPlatform !== 'All' && g.platform !== fPlatform) return false;
+        if (fYear !== 'All' && g.year != fYear) return false; 
+        
+        // Handle Score Brackets
+        if (fScore !== 'All') {
+            const scoreNum = parseInt(g.score) || 0;
+            if (fScore === 'unscored' && scoreNum > 0) return false;
+            if (fScore === '90' && scoreNum < 90) return false;
+            if (fScore === '80' && (scoreNum < 80 || scoreNum >= 90)) return false;
+            if (fScore === '70' && (scoreNum < 70 || scoreNum >= 80)) return false;
+        }
+        
+        return true;
+    });
+
+    // 3. Sort the remaining games
+    filtered.sort((a, b) => {
+        const yearA = parseInt(a.year) || 0;
+        const yearB = parseInt(b.year) || 0;
+        const scoreA = parseInt(a.score) || 0;
+        const scoreB = parseInt(b.score) || 0;
+
+        if (sortVal === 'yearDesc') return yearB - yearA;
+        if (sortVal === 'yearAsc') return yearA - yearB;
+        if (sortVal === 'scoreDesc') return scoreB - scoreA;
+        if (sortVal === 'scoreAsc') return scoreA - scoreB;
+    });
+
+    // 4. Update the game counter badge next to the Title
+    document.getElementById('gameCountBadge').innerText = `(${filtered.length} games)`;
+
+    // 5. Draw the filtered/sorted cards inside the Grid Container
+    const grid = document.getElementById('allGamesGrid');
+    
+    if (filtered.length === 0) {
+        grid.innerHTML = `<div class="col-span-full text-center p-12 text-gray-500 font-bold border border-gray-700 rounded-lg bg-gray-800 shadow-inner">No games match these filters.</div>`;
+        return;
+    }
+
+    grid.innerHTML = filtered.map(item => {
+        let badgeColor = item.type === 'Main Game' ? 'bg-purple-600' : item.type === 'Port' ? 'bg-green-600' : item.type === 'Remake' ? 'bg-blue-600' : 'bg-yellow-600';
+
+        return `
+        <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow flex flex-col relative hover:border-gray-500 transition">
+            
+            <div class="absolute top-2 left-2 flex gap-1 z-20">
+                <button onclick="deleteGame('${item.id}')" title="Delete" class="bg-gray-800/90 hover:bg-red-600 text-white w-7 h-7 rounded-full flex items-center justify-center transition border border-gray-600 shadow-md text-xs">🗑️</button>
+                <button onclick="openEditModal('${item.id}')" title="Edit" class="bg-gray-800/90 hover:bg-blue-600 text-white w-7 h-7 rounded-full flex items-center justify-center transition border border-gray-600 shadow-md text-xs">✏️</button>
+            </div>
+
+            <span class="absolute top-2 right-2 ${badgeColor} text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg z-10">${item.type}</span>
+
+            <img src="${item.coverImg}" onclick="openGameDetails('${item.id}')" class="w-full aspect-[80/107] object-cover rounded mb-3 shadow-md cursor-pointer hover:opacity-80 transition" title="Click for details">
+            
+            <h3 class="font-bold text-lg text-white leading-tight mb-1">${item.title}</h3>
+            <p class="text-purple-400 text-[10px] uppercase font-bold tracking-wider mb-2 truncate" title="${item.franchiseName}">${item.franchiseName}</p>
+            
+            <div class="mt-auto pt-2 border-t border-gray-700 mb-3 flex flex-col justify-between">
+                <p class="text-gray-400 text-xs mb-1">${item.year} | <span class="text-gray-300 font-semibold">${item.platform}</span></p>
+                <div class="flex justify-between items-center mt-2">
+                    <span class="text-[10px] font-bold uppercase tracking-wider ${getStatusColor(item.status)}">${item.status || 'Not Played'}</span>
+                    <span class="text-yellow-500 font-black text-sm">${item.score ? '★ ' + item.score : ''}</span>
+                </div>
+            </div>
+        </div>
+        `;
+    }).join('');
 }
 // --- NEW: DATA MANAGEMENT (EXPORT / IMPORT) ---
 function exportVault() {
@@ -719,3 +899,60 @@ if (universalForm) {
         loadLibrary();
     });
 }
+// ==========================================
+// --- NEW: GLOBAL SEARCH ENGINE ---
+// ==========================================
+function handleSearch() {
+    const query = document.getElementById('searchInput').value.toLowerCase();
+    const resultsBox = document.getElementById('searchResults');
+    
+    // Only search if 3 or more characters are typed
+    if (query.length < 3) {
+        resultsBox.classList.add('hidden');
+        return;
+    }
+
+    let vaultData = JSON.parse(localStorage.getItem('myVaultData'));
+    if (!vaultData) return;
+
+    let matches = [];
+    
+    // The Great Crawl: Search every franchise and every sub-branch
+    vaultData.franchises.forEach(f => {
+        if (f.mainGames) {
+            f.mainGames.forEach(g => {
+                if (g.title.toLowerCase().includes(query)) matches.push({...g, franchiseName: f.name});
+                if (g.ports) g.ports.forEach(p => { if (p.title.toLowerCase().includes(query)) matches.push({...p, franchiseName: f.name}); });
+                if (g.remakes) g.remakes.forEach(r => { if (r.title.toLowerCase().includes(query)) matches.push({...r, franchiseName: f.name}); });
+                if (g.sequels) g.sequels.forEach(s => { if (s.title.toLowerCase().includes(query)) matches.push({...s, franchiseName: f.name}); });
+            });
+        }
+    });
+
+    // Draw the results
+    if (matches.length === 0) {
+        resultsBox.innerHTML = `<div class="p-4 text-gray-400 text-sm text-center">No games found...</div>`;
+    } else {
+        // Limit to top 10 results to keep it clean
+        resultsBox.innerHTML = matches.slice(0, 10).map(match => `
+            <div onclick="openGameDetails('${match.id}'); document.getElementById('searchResults').classList.add('hidden'); document.getElementById('searchInput').value='';" 
+                 class="p-3 border-b border-gray-700 hover:bg-gray-700 cursor-pointer flex items-center gap-4 transition">
+                <img src="${match.coverImg}" class="w-10 h-14 object-cover rounded shadow">
+                <div>
+                    <div class="text-white font-bold text-sm">${match.title}</div>
+                    <div class="text-purple-400 text-[10px] uppercase tracking-wider font-bold">${match.franchiseName} • ${match.year}</div>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    resultsBox.classList.remove('hidden');
+}
+
+// Hide the search dropdown if you click anywhere else on the screen
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.relative')) {
+        const resultsBox = document.getElementById('searchResults');
+        if(resultsBox) resultsBox.classList.add('hidden');
+    }
+});
