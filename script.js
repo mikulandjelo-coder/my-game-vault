@@ -15,7 +15,7 @@ let state = {
             franchise: 'All',
             platform: 'All',
             year: 'All',
-            score: 'All',
+            genre: 'All',
             sort: 'yearDesc'
         },
         franchiseAllGames: {}, // { [franchiseId]: { sort: 'yearAsc' | 'yearDesc' | 'scoreDesc' | 'scoreAsc' } }
@@ -183,13 +183,17 @@ function renderMainGames(games, container) {
     games.sort((a, b) => {
         const yearA = parseInt(a.year) || 0;
         const yearB = parseInt(b.year) || 0;
-        const scoreA = parseInt(a.score) || 0;
-        const scoreB = parseInt(b.score) || 0;
+        const personalA = parseInt(a.personalScore || a.score) || 0;
+        const personalB = parseInt(b.personalScore || b.score) || 0;
+        const aggA = parseInt(a.aggScore) || 0;
+        const aggB = parseInt(b.aggScore) || 0;
 
         switch (mainFilterState.sort) {
             case 'yearDesc': return yearB - yearA;
-            case 'scoreDesc': return scoreB - scoreA;
-            case 'scoreAsc': return scoreA - scoreB;
+            case 'personalDesc': return personalB - personalA;
+            case 'personalAsc': return personalA - personalB;
+            case 'aggDesc': return aggB - aggA;
+            case 'aggAsc': return aggA - aggB;
             case 'yearAsc':
             default:
                 return yearA - yearB;
@@ -205,8 +209,10 @@ function renderMainGames(games, container) {
                 <select id="mainGamesSort" onchange="onMainGamesSortChange('${franchiseId}')" class="bg-gray-900 text-white text-xs rounded px-2 py-1 border border-gray-600 focus:border-purple-500 outline-none">
                     <option value="yearAsc" ${mainFilterState.sort === 'yearAsc' ? 'selected' : ''}>Year (Oldest First)</option>
                     <option value="yearDesc" ${mainFilterState.sort === 'yearDesc' ? 'selected' : ''}>Year (Newest First)</option>
-                    <option value="scoreDesc" ${mainFilterState.sort === 'scoreDesc' ? 'selected' : ''}>Score (Highest First)</option>
-                    <option value="scoreAsc" ${mainFilterState.sort === 'scoreAsc' ? 'selected' : ''}>Score (Lowest First)</option>
+                    <option value="personalDesc" ${mainFilterState.sort === 'personalDesc' ? 'selected' : ''}>Personal Score (Highest)</option>
+                    <option value="personalAsc" ${mainFilterState.sort === 'personalAsc' ? 'selected' : ''}>Personal Score (Lowest)</option>
+                    <option value="aggDesc" ${mainFilterState.sort === 'aggDesc' ? 'selected' : ''}>Aggregate Score (Highest)</option>
+                    <option value="aggAsc" ${mainFilterState.sort === 'aggAsc' ? 'selected' : ''}>Aggregate Score (Lowest)</option>
                 </select>
             </div>
         </div>
@@ -227,6 +233,10 @@ function renderMainGames(games, container) {
                     <button onclick="deleteGame('${game.id}')" title="Delete" class="bg-gray-800/90 hover:bg-gray-600 text-white w-7 h-7 rounded-full flex items-center justify-center transition border border-gray-600 shadow-md text-xs">🗑️</button>
                     <button onclick="openEditModal('${game.id}')" title="Edit" class="bg-gray-800/90 hover:bg-gray-600 text-white w-7 h-7 rounded-full flex items-center justify-center transition border border-gray-600 shadow-md text-xs">✏️</button>
                 </div>
+
+                ${hasNotes(game) ? `<div class="absolute top-2 right-2 z-20">
+                    <span class="bg-gray-900/90 border border-purple-500 text-purple-300 text-[10px] px-2 py-1 rounded-full shadow-sm">📝 Notes</span>
+                </div>` : ''}
 
                 <img src="${game.coverImg}" onclick="openGameDetails('${game.id}')" class="w-full aspect-[80/107] object-cover rounded mb-3 shadow-md cursor-pointer hover:opacity-80 transition" title="Click for details">
                 
@@ -306,13 +316,17 @@ function renderAllGames(franchise, container) {
     allGamesList.sort((a, b) => {
         const yearA = parseInt(a.year) || 0;
         const yearB = parseInt(b.year) || 0;
-        const scoreA = parseInt(a.score) || 0;
-        const scoreB = parseInt(b.score) || 0;
+        const personalA = parseInt(a.personalScore || a.score) || 0;
+        const personalB = parseInt(b.personalScore || b.score) || 0;
+        const aggA = parseInt(a.aggScore) || 0;
+        const aggB = parseInt(b.aggScore) || 0;
 
         switch (faState.sort) {
             case 'yearDesc': return yearB - yearA;
-            case 'scoreDesc': return scoreB - scoreA;
-            case 'scoreAsc': return scoreA - scoreB;
+            case 'personalDesc': return personalB - personalA;
+            case 'personalAsc': return personalA - personalB;
+            case 'aggDesc': return aggB - aggA;
+            case 'aggAsc': return aggA - aggB;
             case 'yearAsc':
             default:
                 return yearA - yearB;
@@ -327,8 +341,10 @@ function renderAllGames(franchise, container) {
                 <select id="franchiseSort" onchange="onFranchiseAllSortChange('${franchiseId}')" class="bg-gray-900 text-white text-xs rounded px-2 py-1 border border-gray-600 focus:border-purple-500 outline-none">
                     <option value="yearAsc" ${faState.sort === 'yearAsc' ? 'selected' : ''}>Year (Oldest First)</option>
                     <option value="yearDesc" ${faState.sort === 'yearDesc' ? 'selected' : ''}>Year (Newest First)</option>
-                    <option value="scoreDesc" ${faState.sort === 'scoreDesc' ? 'selected' : ''}>Score (Highest First)</option>
-                    <option value="scoreAsc" ${faState.sort === 'scoreAsc' ? 'selected' : ''}>Score (Lowest First)</option>
+                    <option value="personalDesc" ${faState.sort === 'personalDesc' ? 'selected' : ''}>Personal Score (Highest)</option>
+                    <option value="personalAsc" ${faState.sort === 'personalAsc' ? 'selected' : ''}>Personal Score (Lowest)</option>
+                    <option value="aggDesc" ${faState.sort === 'aggDesc' ? 'selected' : ''}>Aggregate Score (Highest)</option>
+                    <option value="aggAsc" ${faState.sort === 'aggAsc' ? 'selected' : ''}>Aggregate Score (Lowest)</option>
                 </select>
             </div>
         </div>
@@ -352,6 +368,10 @@ function renderAllGames(franchise, container) {
                 </div>
 
                 <span class="absolute top-2 right-2 ${badgeColor} text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg z-10">${item.type}</span>
+
+                ${hasNotes(item) ? `<div class="absolute bottom-2 right-2 z-20">
+                    <span class="bg-gray-900/90 border border-purple-500 text-purple-300 text-[10px] px-2 py-1 rounded-full shadow-sm">📝</span>
+                </div>` : ''}
 
                 <img src="${item.coverImg}" onclick="openGameDetails('${item.id}')" class="w-full aspect-[80/107] object-cover rounded mb-3 shadow-md cursor-pointer hover:opacity-80 transition" title="Click for details">
                 
@@ -457,6 +477,10 @@ function renderWishlist(franchises, container) {
                 <button onclick="openEditModal('${item.id}')" title="Edit" class="bg-gray-800/90 hover:bg-gray-600 text-white w-7 h-7 rounded-full flex items-center justify-center transition border border-gray-600 shadow-md text-xs">✏️</button>
             </div>
 
+            ${hasNotes(item) ? `<div class="absolute bottom-2 right-2 z-20">
+                <span class="bg-gray-900/90 border border-purple-500 text-purple-300 text-[10px] px-2 py-1 rounded-full shadow-sm">📝</span>
+            </div>` : ''}
+
             <img src="${item.coverImg}" onclick="openGameDetails('${item.id}')" class="w-full aspect-[80/107] object-cover rounded mb-3 shadow-md cursor-pointer hover:opacity-80 transition" title="Click for details">
             
             <h3 class="font-bold text-lg text-white leading-tight mb-1">${item.title}</h3>
@@ -536,13 +560,14 @@ function renderGlobalAllGames(franchises, container) {
     const platforms = [...new Set(window.masterGamesList.map(g => g.platform).filter(Boolean))].sort();
     const years = [...new Set(window.masterGamesList.map(g => g.year).filter(Boolean))].sort((a, b) => b - a);
     const franchiseNames = [...new Set(window.masterGamesList.map(g => g.franchiseName))].sort();
+    const genres = [...new Set(window.masterGamesList.map(g => g.genre).filter(Boolean))].sort();
 
     // 3. Build the Header & Filter Dashboard HTML
     const globalFilterDefaults = {
         franchise: 'All',
         platform: 'All',
         year: 'All',
-        score: 'All',
+        genre: 'All',
         sort: 'yearDesc'
     };
     const gfStateHeader = state.filters && state.filters.globalAllGames
@@ -582,13 +607,10 @@ function renderGlobalAllGames(franchises, container) {
                 </div>
 
                 <div>
-                    <label class="block text-[10px] text-gray-400 mb-1 font-bold uppercase tracking-wider">Score</label>
-                    <select id="filterScore" onchange="applyGlobalFilters()" class="w-full bg-gray-900 text-white rounded p-2 outline-none border border-gray-600 text-sm focus:border-blue-500 cursor-pointer">
-                        <option value="All" ${gfStateHeader.score === 'All' ? 'selected' : ''}>All Scores</option>
-                        <option value="90" ${gfStateHeader.score === '90' ? 'selected' : ''}>90 - 100 (Masterpiece)</option>
-                        <option value="80" ${gfStateHeader.score === '80' ? 'selected' : ''}>80 - 89 (Great)</option>
-                        <option value="70" ${gfStateHeader.score === '70' ? 'selected' : ''}>70 - 79 (Good)</option>
-                        <option value="unscored" ${gfStateHeader.score === 'unscored' ? 'selected' : ''}>Unscored</option>
+                    <label class="block text-[10px] text-gray-400 mb-1 font-bold uppercase tracking-wider">Genre</label>
+                    <select id="filterGenre" onchange="applyGlobalFilters()" class="w-full bg-gray-900 text-white rounded p-2 outline-none border border-gray-600 text-sm focus:border-blue-500 cursor-pointer">
+                        <option value="All">All Genres</option>
+                        ${genres.map(g => `<option value="${g}" ${gfStateHeader.genre === g ? 'selected' : ''}>${g}</option>`).join('')}
                     </select>
                 </div>
 
@@ -597,8 +619,10 @@ function renderGlobalAllGames(franchises, container) {
                     <select id="sortOptions" onchange="applyGlobalFilters()" class="w-full bg-gray-900 text-blue-400 rounded p-2 outline-none border border-blue-600 text-sm focus:border-blue-400 cursor-pointer font-bold">
                         <option value="yearDesc" ${gfStateHeader.sort === 'yearDesc' ? 'selected' : ''}>Year (Newest First)</option>
                         <option value="yearAsc" ${gfStateHeader.sort === 'yearAsc' ? 'selected' : ''}>Year (Oldest First)</option>
-                        <option value="scoreDesc" ${gfStateHeader.sort === 'scoreDesc' ? 'selected' : ''}>Score (Highest First)</option>
-                        <option value="scoreAsc" ${gfStateHeader.sort === 'scoreAsc' ? 'selected' : ''}>Score (Lowest First)</option>
+                        <option value="personalDesc" ${gfStateHeader.sort === 'personalDesc' ? 'selected' : ''}>Personal Score (Highest)</option>
+                        <option value="personalAsc" ${gfStateHeader.sort === 'personalAsc' ? 'selected' : ''}>Personal Score (Lowest)</option>
+                        <option value="aggDesc" ${gfStateHeader.sort === 'aggDesc' ? 'selected' : ''}>Aggregate Score (Highest)</option>
+                        <option value="aggAsc" ${gfStateHeader.sort === 'aggAsc' ? 'selected' : ''}>Aggregate Score (Lowest)</option>
                     </select>
                 </div>
 
@@ -619,7 +643,7 @@ function applyGlobalFilters() {
     const fFranchise = document.getElementById('filterFranchise').value;
     const fPlatform = document.getElementById('filterPlatform').value;
     const fYear = document.getElementById('filterYear').value;
-    const fScore = document.getElementById('filterScore').value;
+    const fGenre = document.getElementById('filterGenre').value;
     const sortVal = document.getElementById('sortOptions').value;
 
     // Persist global filters/sorting
@@ -628,7 +652,7 @@ function applyGlobalFilters() {
             franchise: fFranchise,
             platform: fPlatform,
             year: fYear,
-            score: fScore,
+            genre: fGenre,
             sort: sortVal
         };
         saveUiState();
@@ -639,15 +663,7 @@ function applyGlobalFilters() {
         if (fFranchise !== 'All' && g.franchiseName !== fFranchise) return false;
         if (fPlatform !== 'All' && g.platform !== fPlatform) return false;
         if (fYear !== 'All' && g.year != fYear) return false; 
-        
-        // Handle Score Brackets
-        if (fScore !== 'All') {
-            const scoreNum = parseInt(g.score) || 0;
-            if (fScore === 'unscored' && scoreNum > 0) return false;
-            if (fScore === '90' && scoreNum < 90) return false;
-            if (fScore === '80' && (scoreNum < 80 || scoreNum >= 90)) return false;
-            if (fScore === '70' && (scoreNum < 70 || scoreNum >= 80)) return false;
-        }
+        if (fGenre !== 'All' && g.genre !== fGenre) return false;
         
         return true;
     });
@@ -656,13 +672,17 @@ function applyGlobalFilters() {
     filtered.sort((a, b) => {
         const yearA = parseInt(a.year) || 0;
         const yearB = parseInt(b.year) || 0;
-        const scoreA = parseInt(a.score) || 0;
-        const scoreB = parseInt(b.score) || 0;
+        const personalA = parseInt(a.personalScore || a.score) || 0;
+        const personalB = parseInt(b.personalScore || b.score) || 0;
+        const aggA = parseInt(a.aggScore) || 0;
+        const aggB = parseInt(b.aggScore) || 0;
 
         if (sortVal === 'yearDesc') return yearB - yearA;
         if (sortVal === 'yearAsc') return yearA - yearB;
-        if (sortVal === 'scoreDesc') return scoreB - scoreA;
-        if (sortVal === 'scoreAsc') return scoreA - scoreB;
+        if (sortVal === 'personalDesc') return personalB - personalA;
+        if (sortVal === 'personalAsc') return personalA - personalB;
+        if (sortVal === 'aggDesc') return aggB - aggA;
+        if (sortVal === 'aggAsc') return aggA - aggB;
     });
 
     // 4. Update the game counter badge next to the Title
@@ -688,6 +708,10 @@ function applyGlobalFilters() {
             </div>
 
             <span class="absolute top-2 right-2 ${badgeColor} text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg z-10">${item.type}</span>
+
+            ${hasNotes(item) ? `<div class="absolute bottom-2 right-2 z-20">
+                <span class="bg-gray-900/90 border border-purple-500 text-purple-300 text-[10px] px-2 py-1 rounded-full shadow-sm">📝</span>
+            </div>` : ''}
 
             <img src="${item.coverImg}" onclick="openGameDetails('${item.id}')" class="w-full aspect-[80/107] object-cover rounded mb-3 shadow-md cursor-pointer hover:opacity-80 transition" title="Click for details">
             
@@ -939,6 +963,10 @@ function toggleFormFields() {
         franchiseFields.classList.remove('hidden');
     }
 }
+const hasNotes = (game) => {
+    return !!(game && typeof game.notes === 'string' && game.notes.trim().length > 0);
+};
+
 // --- NEW: Game Details Zoom View ---
 function openGameDetails(gameId) {
     let vaultData = JSON.parse(localStorage.getItem('myVaultData'));
@@ -968,7 +996,11 @@ function openGameDetails(gameId) {
     document.getElementById('dGenre').innerText = targetGame.genre || 'Unknown';
     document.getElementById('dDev').innerText = targetGame.developer || 'Unknown';
     document.getElementById('dOwnership').innerText = targetGame.ownership || 'Not Owned';
-    document.getElementById('dScore').innerText = targetGame.score || '-';
+    const aggScore = targetGame.aggScore || '-';
+    const personalScore = targetGame.personalScore || targetGame.score || '-';
+    document.getElementById('dAggScore').innerText = aggScore;
+    document.getElementById('dPersonalScore').innerText = personalScore;
+    document.getElementById('dNotes').innerText = targetGame.notes || '';
     
     let statusEl = document.getElementById('dStatus');
     statusEl.innerText = targetGame.status || 'Not Played';
@@ -1064,11 +1096,14 @@ function openEditModal(gameId) {
     document.getElementById('gTitle').value = targetGame.title;
     document.getElementById('gYear').value = targetGame.year;
     document.getElementById('gPlatform').value = targetGame.platform;
-    document.getElementById('gScore').value = targetGame.score !== '-' ? targetGame.score : '';
+    document.getElementById('gAggScore').value = targetGame.aggScore && targetGame.aggScore !== '-' ? targetGame.aggScore : '';
+    const personalForEdit = (targetGame.personalScore || targetGame.score || '');
+    document.getElementById('gScore').value = personalForEdit !== '-' ? personalForEdit : '';
     document.getElementById('gDev').value = targetGame.developer !== 'Unknown' ? targetGame.developer : '';
     document.getElementById('gGenre').value = targetGame.genre || '';
     document.getElementById('gPlayStatus').value = targetGame.status || 'Not Played';
     document.getElementById('gOwnership').value = targetGame.ownership || 'Not Owned';
+    document.getElementById('gNotes').value = targetGame.notes || '';
     
     let cover = targetGame.coverImg;
     document.getElementById('gCover').value = cover.includes('placehold.co') ? '' : cover;
@@ -1109,12 +1144,14 @@ if (universalForm) {
             const title = document.getElementById('gTitle').value;
             const year = parseInt(document.getElementById('gYear').value) || 0;
             const platform = document.getElementById('gPlatform').value;
-            const score = document.getElementById('gScore').value || '-';
+            const aggScore = document.getElementById('gAggScore').value || '-';
+            const personalScore = document.getElementById('gScore').value || '-';
             const dev = document.getElementById('gDev').value || 'Unknown';
             const genre = document.getElementById('gGenre').value || 'Unknown'; // <-- NEW
             const parentId = document.getElementById('gParent').value;
             const playStatus = document.getElementById('gPlayStatus').value;
             const ownership = document.getElementById('gOwnership').value;
+            const notes = document.getElementById('gNotes').value || '';
             
             let customCover = document.getElementById('gCover').value;
             let finalCover = customCover ? customCover : '[https://placehold.co/160x214?text=](https://placehold.co/160x214?text=)' + title.replace(/ /g, '+');
@@ -1198,11 +1235,14 @@ if (universalForm) {
                 editedGame.title = title;
                 editedGame.year = year;
                 editedGame.platform = platform;
-                editedGame.score = score;
+                editedGame.aggScore = aggScore;
+                editedGame.personalScore = personalScore;
+                editedGame.score = personalScore; // keep legacy compatibility
                 editedGame.developer = dev;
                 editedGame.genre = genre;
                 editedGame.status = playStatus;
                 editedGame.ownership = ownership;
+                editedGame.notes = notes;
                 editedGame.coverImg = finalCover;
 
                 // Reinsert into new location if moved
@@ -1234,10 +1274,13 @@ if (universalForm) {
                     platform: platform,
                     developer: dev,
                     genre: genre, 
-                    score: score,   
+                    aggScore: aggScore,
+                    personalScore: personalScore,
+                    score: personalScore,   
                     status: playStatus, 
                     ownership: ownership, 
-                    coverImg: finalCover 
+                    coverImg: finalCover,
+                    notes: notes 
                 };
 
                 let franchise = vaultData.franchises.find(f => f.id === tFranchiseId);
