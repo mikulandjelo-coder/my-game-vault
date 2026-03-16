@@ -1,11 +1,81 @@
 // 1. App State Tracker
+const UI_STATE_KEY = 'myVaultUiState';
+
 let state = {
-    view: 'franchises', 
+    view: 'franchises',
     activeFranchiseId: null,
+    // Legacy single-sub-branch fields are kept for backward compatibility but no longer used
     activeSubId: null,
     activeCategory: null,
-    editingGameId: null 
+    // NEW: per-game, per-category open state for sub-branches
+    openSubBranches: {},
+    // NEW: filters & sorting per-view
+    filters: {
+        globalAllGames: {
+            franchise: 'All',
+            platform: 'All',
+            year: 'All',
+            score: 'All',
+            sort: 'yearDesc'
+        },
+        franchiseAllGames: {}, // { [franchiseId]: { sort: 'yearAsc' | 'yearDesc' | 'scoreDesc' | 'scoreAsc' } }
+        mainGames: {},         // { [franchiseId]: { sort: 'yearAsc' | 'yearDesc' | 'scoreDesc' | 'scoreAsc' } }
+        wishlist: {
+            sort: 'yearDesc'
+        }
+    },
+    editingGameId: null,
+    // NEW: remembers where an edited game originally lived
+    editingContext: null
 };
+
+function loadUiState() {
+    try {
+        const raw = localStorage.getItem(UI_STATE_KEY);
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        // Shallow-merge, but keep default shapes for nested structures
+        state = {
+            ...state,
+            ...saved,
+            filters: {
+                ...state.filters,
+                ...(saved.filters || {}),
+                globalAllGames: {
+                    ...state.filters.globalAllGames,
+                    ...(saved.filters && saved.filters.globalAllGames ? saved.filters.globalAllGames : {})
+                },
+                wishlist: {
+                    ...state.filters.wishlist,
+                    ...(saved.filters && saved.filters.wishlist ? saved.filters.wishlist : {})
+                },
+                franchiseAllGames: saved.filters && saved.filters.franchiseAllGames
+                    ? saved.filters.franchiseAllGames
+                    : state.filters.franchiseAllGames,
+                mainGames: saved.filters && saved.filters.mainGames
+                    ? saved.filters.mainGames
+                    : state.filters.mainGames
+            },
+            openSubBranches: saved.openSubBranches || state.openSubBranches
+        };
+    } catch (e) {
+        console.warn('Failed to load UI state, using defaults.', e);
+    }
+}
+
+function saveUiState() {
+    const snapshot = {
+        view: state.view,
+        activeFranchiseId: state.activeFranchiseId,
+        openSubBranches: state.openSubBranches,
+        filters: state.filters
+    };
+    try {
+        localStorage.setItem(UI_STATE_KEY, JSON.stringify(snapshot));
+    } catch (e) {
+        console.warn('Failed to save UI state.', e);
+    }
+}
 
 // --- NEW: The Visual Style Guide ---
 const getStatusColor = (status) => {
@@ -20,8 +90,9 @@ const getStatusColor = (status) => {
 };
 
 window.onload = function() {
+    loadUiState();
     loadLibrary();
-    
+
     // NEW: Listen for changes on the Franchise dropdown
     const franchiseSelect = document.getElementById('gFranchise');
     if (franchiseSelect) {
@@ -69,7 +140,7 @@ function renderFranchises(franchises, container) {
 
         let buttonsHtml = state.view === 'franchises' 
             ? `<button onclick="openMainGames('${franchise.id}')" class="bg-purple-600 hover:bg-purple-500 text-white text-xs px-4 py-2 rounded font-bold shadow transition w-full">Main Games</button>
-               <button onclick="openAllGames('${franchise.id}')" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-4 py-2 rounded font-bold shadow transition w-full">Branch View</button>`
+               <button onclick="openAllGames('${franchise.id}')" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-4 py-2 rounded font-bold shadow transition w-full">All Games</button>`
             : `<button onclick="goBack()" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-4 py-2 rounded font-bold shadow transition w-full">← Close Branch</button>`;
 
         // The new vertical, compact card layout
@@ -104,7 +175,44 @@ function renderFranchises(franchises, container) {
 
 // 3. Render Layer 2 (Main Games Branch)
 function renderMainGames(games, container) {
-    let gamesHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4 pl-4 border-l-4 border-purple-600 ml-8 mb-12">`;
+    const franchiseId = state.activeFranchiseId;
+    const mainFilterState = (state.filters.mainGames && state.filters.mainGames[franchiseId]) || { sort: 'yearAsc' };
+
+    // Apply sorting to the main games list
+    games = [...games]; // shallow copy so we don't mutate original
+    games.sort((a, b) => {
+        const yearA = parseInt(a.year) || 0;
+        const yearB = parseInt(b.year) || 0;
+        const scoreA = parseInt(a.score) || 0;
+        const scoreB = parseInt(b.score) || 0;
+
+        switch (mainFilterState.sort) {
+            case 'yearDesc': return yearB - yearA;
+            case 'scoreDesc': return scoreB - scoreA;
+            case 'scoreAsc': return scoreA - scoreB;
+            case 'yearAsc':
+            default:
+                return yearA - yearB;
+        }
+    });
+
+    // Controls bar for sorting
+    let controlsHTML = `
+        <div class="flex justify-between items-center mt-4 ml-8 mb-2">
+            <h2 class="text-lg font-bold text-purple-400">Main Games</h2>
+            <div class="flex items-center gap-2 text-xs text-gray-300">
+                <span class="uppercase tracking-wider font-bold text-[10px]">Sort By</span>
+                <select id="mainGamesSort" onchange="onMainGamesSortChange('${franchiseId}')" class="bg-gray-900 text-white text-xs rounded px-2 py-1 border border-gray-600 focus:border-purple-500 outline-none">
+                    <option value="yearAsc" ${mainFilterState.sort === 'yearAsc' ? 'selected' : ''}>Year (Oldest First)</option>
+                    <option value="yearDesc" ${mainFilterState.sort === 'yearDesc' ? 'selected' : ''}>Year (Newest First)</option>
+                    <option value="scoreDesc" ${mainFilterState.sort === 'scoreDesc' ? 'selected' : ''}>Score (Highest First)</option>
+                    <option value="scoreAsc" ${mainFilterState.sort === 'scoreAsc' ? 'selected' : ''}>Score (Lowest First)</option>
+                </select>
+            </div>
+        </div>
+    `;
+
+    let gamesHTML = `${controlsHTML}<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-2 pl-4 border-l-4 border-purple-600 ml-8 mb-12">`;
     
     games.forEach(game => {
         // NEW: Smart Conditional Buttons! Only show if they exist and have length > 0
@@ -139,8 +247,15 @@ function renderMainGames(games, container) {
             </div>
         `;
 
-        if (state.activeSubId === game.id && game[state.activeCategory]) {
-            gamesHTML += renderSubBranch(game[state.activeCategory], state.activeCategory);
+        const openConfig = state.openSubBranches && state.openSubBranches[game.id];
+        if (openConfig && game.ports && openConfig.ports) {
+            gamesHTML += renderSubBranch(game.ports, 'ports');
+        }
+        if (openConfig && game.remakes && openConfig.remakes) {
+            gamesHTML += renderSubBranch(game.remakes, 'remakes');
+        }
+        if (openConfig && game.sequels && openConfig.sequels) {
+            gamesHTML += renderSubBranch(game.sequels, 'sequels');
         }
     });
     
@@ -185,9 +300,41 @@ function renderAllGames(franchise, container) {
         });
     }
 
-    allGamesList.sort((a, b) => a.year - b.year);
+    const franchiseId = franchise.id;
+    const faState = (state.filters.franchiseAllGames && state.filters.franchiseAllGames[franchiseId]) || { sort: 'yearAsc' };
 
-    let html = `<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-6 mb-12">`;
+    allGamesList.sort((a, b) => {
+        const yearA = parseInt(a.year) || 0;
+        const yearB = parseInt(b.year) || 0;
+        const scoreA = parseInt(a.score) || 0;
+        const scoreB = parseInt(b.score) || 0;
+
+        switch (faState.sort) {
+            case 'yearDesc': return yearB - yearA;
+            case 'scoreDesc': return scoreB - scoreA;
+            case 'scoreAsc': return scoreA - scoreB;
+            case 'yearAsc':
+            default:
+                return yearA - yearB;
+        }
+    });
+
+    const controlsHTML = `
+        <div class="flex justify-between items-center mt-4 ml-4 mb-2">
+            <h2 class="text-lg font-bold text-gray-200">All Games</h2>
+            <div class="flex items-center gap-2 text-xs text-gray-300">
+                <span class="uppercase tracking-wider font-bold text-[10px]">Sort By</span>
+                <select id="franchiseSort" onchange="onFranchiseAllSortChange('${franchiseId}')" class="bg-gray-900 text-white text-xs rounded px-2 py-1 border border-gray-600 focus:border-purple-500 outline-none">
+                    <option value="yearAsc" ${faState.sort === 'yearAsc' ? 'selected' : ''}>Year (Oldest First)</option>
+                    <option value="yearDesc" ${faState.sort === 'yearDesc' ? 'selected' : ''}>Year (Newest First)</option>
+                    <option value="scoreDesc" ${faState.sort === 'scoreDesc' ? 'selected' : ''}>Score (Highest First)</option>
+                    <option value="scoreAsc" ${faState.sort === 'scoreAsc' ? 'selected' : ''}>Score (Lowest First)</option>
+                </select>
+            </div>
+        </div>
+    `;
+
+    let html = `${controlsHTML}<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-2 mb-12">`;
     
     allGamesList.forEach(item => {
         let badgeColor = 'bg-gray-600';
@@ -274,12 +421,29 @@ function renderWishlist(franchises, container) {
         return;
     }
 
-    wishlistGames.sort((a, b) => a.year - b.year);
+    const wlState = (state.filters && state.filters.wishlist) || { sort: 'yearDesc' };
+
+    wishlistGames.sort((a, b) => {
+        const yearA = parseInt(a.year) || 0;
+        const yearB = parseInt(b.year) || 0;
+
+        if (wlState.sort === 'yearAsc') return yearA - yearB;
+        return yearB - yearA;
+    });
 
     let html = `
         <div class="mb-6 flex justify-between items-center mt-4">
             <h2 class="text-3xl font-bold text-yellow-500 flex items-center gap-2">⭐ My Wishlist</h2>
-            <button onclick="goHome()" class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded font-bold shadow transition">← Back to Vault</button>
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 text-xs text-gray-300">
+                    <span class="uppercase tracking-wider font-bold text-[10px]">Sort By</span>
+                    <select id="wishlistSort" onchange="onWishlistSortChange()" class="bg-gray-900 text-white text-xs rounded px-2 py-1 border border-gray-600 focus:border-yellow-500 outline-none">
+                        <option value="yearDesc" ${wlState.sort === 'yearDesc' ? 'selected' : ''}>Year (Newest First)</option>
+                        <option value="yearAsc" ${wlState.sort === 'yearAsc' ? 'selected' : ''}>Year (Oldest First)</option>
+                    </select>
+                </div>
+                <button onclick="goHome()" class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded font-bold shadow transition">← Back to Vault</button>
+            </div>
         </div>
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-12">
     `;
@@ -316,9 +480,41 @@ function renderWishlist(franchises, container) {
     html += `</div>`;
     container.innerHTML = html;
 }
+
+// --- NEW: Handlers for sort change events ---
+function onMainGamesSortChange(franchiseId) {
+    const select = document.getElementById('mainGamesSort');
+    if (!select) return;
+    const sortVal = select.value;
+    if (!state.filters.mainGames) state.filters.mainGames = {};
+    state.filters.mainGames[franchiseId] = { sort: sortVal };
+    saveUiState();
+    loadLibrary();
+}
+
+function onFranchiseAllSortChange(franchiseId) {
+    const select = document.getElementById('franchiseSort');
+    if (!select) return;
+    const sortVal = select.value;
+    if (!state.filters.franchiseAllGames) state.filters.franchiseAllGames = {};
+    state.filters.franchiseAllGames[franchiseId] = { sort: sortVal };
+    saveUiState();
+    loadLibrary();
+}
+
+function onWishlistSortChange() {
+    const select = document.getElementById('wishlistSort');
+    if (!select) return;
+    const sortVal = select.value;
+    if (!state.filters.wishlist) state.filters.wishlist = {};
+    state.filters.wishlist.sort = sortVal;
+    saveUiState();
+    loadLibrary();
+}
 // --- NEW: Global All Games View (Dashboard & Grid) ---
 function openGlobalAllGames() {
     state.view = 'globalAllGames';
+    saveUiState();
     loadLibrary();
 }
 
@@ -342,6 +538,16 @@ function renderGlobalAllGames(franchises, container) {
     const franchiseNames = [...new Set(window.masterGamesList.map(g => g.franchiseName))].sort();
 
     // 3. Build the Header & Filter Dashboard HTML
+    const globalFilterDefaults = {
+        franchise: 'All',
+        platform: 'All',
+        year: 'All',
+        score: 'All',
+        sort: 'yearDesc'
+    };
+    const gfStateHeader = state.filters && state.filters.globalAllGames
+        ? { ...globalFilterDefaults, ...state.filters.globalAllGames }
+        : globalFilterDefaults;
     let html = `
         <div class="mb-6 flex justify-between items-center mt-4 border-b border-gray-700 pb-4">
             <h2 class="text-3xl font-bold text-blue-500 flex items-center gap-2">🌍 Entire Collection <span id="gameCountBadge" class="text-gray-500 text-lg">(${window.masterGamesList.length} games)</span></h2>
@@ -355,7 +561,7 @@ function renderGlobalAllGames(franchises, container) {
                     <label class="block text-[10px] text-gray-400 mb-1 font-bold uppercase tracking-wider">Franchise</label>
                     <select id="filterFranchise" onchange="applyGlobalFilters()" class="w-full bg-gray-900 text-white rounded p-2 outline-none border border-gray-600 text-sm focus:border-blue-500 cursor-pointer">
                         <option value="All">All Franchises</option>
-                        ${franchiseNames.map(f => `<option value="${f}">${f}</option>`).join('')}
+                        ${franchiseNames.map(f => `<option value="${f}" ${gfStateHeader.franchise === f ? 'selected' : ''}>${f}</option>`).join('')}
                     </select>
                 </div>
 
@@ -363,7 +569,7 @@ function renderGlobalAllGames(franchises, container) {
                     <label class="block text-[10px] text-gray-400 mb-1 font-bold uppercase tracking-wider">Platform</label>
                     <select id="filterPlatform" onchange="applyGlobalFilters()" class="w-full bg-gray-900 text-white rounded p-2 outline-none border border-gray-600 text-sm focus:border-blue-500 cursor-pointer">
                         <option value="All">All Platforms</option>
-                        ${platforms.map(p => `<option value="${p}">${p}</option>`).join('')}
+                        ${platforms.map(p => `<option value="${p}" ${gfStateHeader.platform === p ? 'selected' : ''}>${p}</option>`).join('')}
                     </select>
                 </div>
 
@@ -371,28 +577,28 @@ function renderGlobalAllGames(franchises, container) {
                     <label class="block text-[10px] text-gray-400 mb-1 font-bold uppercase tracking-wider">Release Year</label>
                     <select id="filterYear" onchange="applyGlobalFilters()" class="w-full bg-gray-900 text-white rounded p-2 outline-none border border-gray-600 text-sm focus:border-blue-500 cursor-pointer">
                         <option value="All">All Years</option>
-                        ${years.map(y => `<option value="${y}">${y}</option>`).join('')}
+                        ${years.map(y => `<option value="${y}" ${String(gfStateHeader.year) === String(y) ? 'selected' : ''}>${y}</option>`).join('')}
                     </select>
                 </div>
 
                 <div>
                     <label class="block text-[10px] text-gray-400 mb-1 font-bold uppercase tracking-wider">Score</label>
                     <select id="filterScore" onchange="applyGlobalFilters()" class="w-full bg-gray-900 text-white rounded p-2 outline-none border border-gray-600 text-sm focus:border-blue-500 cursor-pointer">
-                        <option value="All">All Scores</option>
-                        <option value="90">90 - 100 (Masterpiece)</option>
-                        <option value="80">80 - 89 (Great)</option>
-                        <option value="70">70 - 79 (Good)</option>
-                        <option value="unscored">Unscored</option>
+                        <option value="All" ${gfStateHeader.score === 'All' ? 'selected' : ''}>All Scores</option>
+                        <option value="90" ${gfStateHeader.score === '90' ? 'selected' : ''}>90 - 100 (Masterpiece)</option>
+                        <option value="80" ${gfStateHeader.score === '80' ? 'selected' : ''}>80 - 89 (Great)</option>
+                        <option value="70" ${gfStateHeader.score === '70' ? 'selected' : ''}>70 - 79 (Good)</option>
+                        <option value="unscored" ${gfStateHeader.score === 'unscored' ? 'selected' : ''}>Unscored</option>
                     </select>
                 </div>
 
                 <div>
                     <label class="block text-[10px] text-blue-400 mb-1 font-bold uppercase tracking-wider">Sort By</label>
                     <select id="sortOptions" onchange="applyGlobalFilters()" class="w-full bg-gray-900 text-blue-400 rounded p-2 outline-none border border-blue-600 text-sm focus:border-blue-400 cursor-pointer font-bold">
-                        <option value="yearDesc">Year (Newest First)</option>
-                        <option value="yearAsc">Year (Oldest First)</option>
-                        <option value="scoreDesc">Score (Highest First)</option>
-                        <option value="scoreAsc">Score (Lowest First)</option>
+                        <option value="yearDesc" ${gfStateHeader.sort === 'yearDesc' ? 'selected' : ''}>Year (Newest First)</option>
+                        <option value="yearAsc" ${gfStateHeader.sort === 'yearAsc' ? 'selected' : ''}>Year (Oldest First)</option>
+                        <option value="scoreDesc" ${gfStateHeader.sort === 'scoreDesc' ? 'selected' : ''}>Score (Highest First)</option>
+                        <option value="scoreAsc" ${gfStateHeader.sort === 'scoreAsc' ? 'selected' : ''}>Score (Lowest First)</option>
                     </select>
                 </div>
 
@@ -415,6 +621,18 @@ function applyGlobalFilters() {
     const fYear = document.getElementById('filterYear').value;
     const fScore = document.getElementById('filterScore').value;
     const sortVal = document.getElementById('sortOptions').value;
+
+    // Persist global filters/sorting
+    if (state.filters && state.filters.globalAllGames) {
+        state.filters.globalAllGames = {
+            franchise: fFranchise,
+            platform: fPlatform,
+            year: fYear,
+            score: fScore,
+            sort: sortVal
+        };
+        saveUiState();
+    }
 
     // 2. Filter the master list
     let filtered = window.masterGamesList.filter(g => {
@@ -545,6 +763,7 @@ function importVault(event) {
 // --- Navigation Helpers ---
 function openWishlist() {
     state.view = 'wishlist';
+    saveUiState();
     loadLibrary();
 }
 
@@ -553,18 +772,22 @@ function goHome() {
     state.activeFranchiseId = null;
     state.activeSubId = null;
     state.activeCategory = null;
+    state.openSubBranches = {};
+    saveUiState();
     loadLibrary();
 }
 
 function openMainGames(franchiseId) {
     state.view = 'mainGames';
     state.activeFranchiseId = franchiseId;
+    saveUiState();
     loadLibrary();
 }
 
 function openAllGames(franchiseId) {
     state.view = 'allGames';
     state.activeFranchiseId = franchiseId;
+    saveUiState();
     loadLibrary();
 }
 
@@ -573,17 +796,17 @@ function goBack() {
     state.activeFranchiseId = null;
     state.activeSubId = null; 
     state.activeCategory = null;
+    state.openSubBranches = {};
+    saveUiState();
     loadLibrary();
 }
 
 function toggleSubBranch(gameId, category) {
-    if (state.activeSubId === gameId && state.activeCategory === category) {
-        state.activeSubId = null;
-        state.activeCategory = null;
-    } else {
-        state.activeSubId = gameId;
-        state.activeCategory = category;
+    if (!state.openSubBranches[gameId]) {
+        state.openSubBranches[gameId] = {};
     }
+    state.openSubBranches[gameId][category] = !state.openSubBranches[gameId][category];
+    saveUiState();
     loadLibrary();
 }
 
@@ -626,6 +849,7 @@ function openFranchiseEdit(id) {
     if (!f) return;
 
     state.editingGameId = id; 
+    state.editingContext = null;
     
     document.getElementById('addModal').classList.remove('hidden');
     document.querySelector('input[name="entryType"][value="franchise"]').checked = true;
@@ -661,7 +885,8 @@ function updateParentDropdown() {
     }
 }
 function openModal() {
-    state.editingGameId = null; 
+    state.editingGameId = null;
+    state.editingContext = null;
     document.querySelector('#addModal h2').innerText = "Add New Entry";
     
     document.getElementById('gFranchise').disabled = false;
@@ -678,6 +903,8 @@ function openModal() {
         vaultData.franchises.forEach(f => {
             franchiseSelect.innerHTML += `<option value="${f.id}">${f.name}</option>`;
         });
+        // Ensure parent list is aligned with the first franchise
+        updateParentDropdown();
     }
 }
 // ... inside openModal() ...
@@ -758,14 +985,43 @@ function closeDetailsModal() {
 function openEditModal(gameId) {
     let vaultData = JSON.parse(localStorage.getItem('myVaultData'));
     let targetGame = null;
+    let sourceFranchiseId = null;
+    let sourceCategory = 'mainGames';
+    let sourceParentId = null;
 
     vaultData.franchises.forEach(f => {
         if (f.mainGames) {
             f.mainGames.forEach(g => {
-                if (g.id === gameId) targetGame = g;
-                if (g.ports) g.ports.forEach(p => { if (p.id === gameId) targetGame = p; });
-                if (g.remakes) g.remakes.forEach(r => { if (r.id === gameId) targetGame = r; });
-                if (g.sequels) g.sequels.forEach(s => { if (s.id === gameId) targetGame = s; });
+                if (g.id === gameId && !targetGame) {
+                    targetGame = g;
+                    sourceFranchiseId = f.id;
+                    sourceCategory = 'mainGames';
+                    sourceParentId = null;
+                }
+                if (g.ports) g.ports.forEach(p => {
+                    if (p.id === gameId && !targetGame) {
+                        targetGame = p;
+                        sourceFranchiseId = f.id;
+                        sourceCategory = 'ports';
+                        sourceParentId = g.id;
+                    }
+                });
+                if (g.remakes) g.remakes.forEach(r => {
+                    if (r.id === gameId && !targetGame) {
+                        targetGame = r;
+                        sourceFranchiseId = f.id;
+                        sourceCategory = 'remakes';
+                        sourceParentId = g.id;
+                    }
+                });
+                if (g.sequels) g.sequels.forEach(s => {
+                    if (s.id === gameId && !targetGame) {
+                        targetGame = s;
+                        sourceFranchiseId = f.id;
+                        sourceCategory = 'sequels';
+                        sourceParentId = g.id;
+                    }
+                });
             });
         }
     });
@@ -773,12 +1029,38 @@ function openEditModal(gameId) {
     if (!targetGame) return;
 
     state.editingGameId = gameId; 
+    state.editingContext = {
+        franchiseId: sourceFranchiseId,
+        category: sourceCategory,
+        parentId: sourceParentId
+    };
     
     document.getElementById('addModal').classList.remove('hidden');
     document.querySelector('input[name="entryType"][value="game"]').checked = true;
     document.querySelector('input[name="entryType"][value="franchise"]').disabled = true; 
     toggleFormFields();
 
+    // Populate franchise dropdown
+    const franchiseSelect = document.getElementById('gFranchise');
+    if (franchiseSelect && vaultData) {
+        franchiseSelect.innerHTML = '';
+        vaultData.franchises.forEach(f => {
+            const selectedAttr = f.id === sourceFranchiseId ? 'selected' : '';
+            franchiseSelect.innerHTML += `<option value="${f.id}" ${selectedAttr}>${f.name}</option>`;
+        });
+    }
+
+    // Populate Attach To dropdown for the selected franchise
+    updateParentDropdown();
+    if (sourceParentId) {
+        const parentSelect = document.getElementById('gParent');
+        if (parentSelect) parentSelect.value = sourceParentId;
+    }
+
+    // Category
+    document.getElementById('gCategory').value = sourceCategory;
+
+    // Core fields
     document.getElementById('gTitle').value = targetGame.title;
     document.getElementById('gYear').value = targetGame.year;
     document.getElementById('gPlatform').value = targetGame.platform;
@@ -792,9 +1074,7 @@ function openEditModal(gameId) {
     document.getElementById('gCover').value = cover.includes('placehold.co') ? '' : cover;
 
     document.querySelector('#addModal h2').innerText = "Edit Game";
-    document.getElementById('gFranchise').disabled = true;
-    document.getElementById('gCategory').disabled = true;
-    document.getElementById('gParent').disabled = true;
+    // Keep category/franchise/parent editable for moving games
 }
 
 // Handling the Save / Update Click
@@ -840,28 +1120,111 @@ if (universalForm) {
             let finalCover = customCover ? customCover : '[https://placehold.co/160x214?text=](https://placehold.co/160x214?text=)' + title.replace(/ /g, '+');
 
             if (state.editingGameId) {
-                const updateGameObject = (game) => {
-                    game.title = title;
-                    game.year = year;
-                    game.platform = platform;
-                    game.score = score;
-                    game.developer = dev;
-                    game.genre = genre;
-                    game.status = playStatus;
-                    game.ownership = ownership;
-                    game.coverImg = finalCover;
-                };
+                const ctx = state.editingContext || {};
+                const oldFranchiseId = ctx.franchiseId;
+                const oldCategory = ctx.category || 'mainGames';
+                const oldParentId = ctx.parentId || null;
 
-                vaultData.franchises.forEach(f => {
-                    if (f.mainGames) {
-                        f.mainGames.forEach(g => {
-                            if (g.id === state.editingGameId) updateGameObject(g);
-                            if (g.ports) g.ports.forEach(p => { if (p.id === state.editingGameId) updateGameObject(p); });
-                            if (g.remakes) g.remakes.forEach(r => { if (r.id === state.editingGameId) updateGameObject(r); });
-                            if (g.sequels) g.sequels.forEach(s => { if (s.id === state.editingGameId) updateGameObject(s); });
-                        });
+                const isLocationChanged =
+                    oldFranchiseId !== tFranchiseId ||
+                    oldCategory !== category ||
+                    (oldCategory !== 'mainGames' && oldParentId !== parentId);
+
+                const findFranchiseById = (id) => vaultData.franchises.find(f => f.id === id);
+
+                const oldFranchise = findFranchiseById(oldFranchiseId) || vaultData.franchises.find(f =>
+                    (f.mainGames || []).some(g =>
+                        g.id === state.editingGameId ||
+                        (g.ports || []).some(p => p.id === state.editingGameId) ||
+                        (g.remakes || []).some(r => r.id === state.editingGameId) ||
+                        (g.sequels || []).some(s => s.id === state.editingGameId)
+                    )
+                );
+                const newFranchise = findFranchiseById(tFranchiseId) || oldFranchise;
+
+                if (!oldFranchise || !newFranchise) {
+                    alert("Could not locate franchise data for this edit.");
+                    return;
+                }
+
+                let editedGame = null;
+
+                if (oldCategory === 'mainGames') {
+                    const idx = oldFranchise.mainGames.findIndex(g => g.id === state.editingGameId);
+                    if (idx !== -1) {
+                        editedGame = oldFranchise.mainGames[idx];
+                        // Detach children if location is changing
+                        if (isLocationChanged) {
+                            ['ports', 'remakes', 'sequels'].forEach(key => {
+                                if (editedGame[key] && editedGame[key].length > 0) {
+                                    newFranchise.mainGames = newFranchise.mainGames || [];
+                                    newFranchise.mainGames.push(...editedGame[key]);
+                                    editedGame[key] = [];
+                                }
+                            });
+                        }
+                        // Remove from old location
+                        if (isLocationChanged) {
+                            oldFranchise.mainGames.splice(idx, 1);
+                        }
                     }
-                });
+                } else {
+                    const parentGame = oldFranchise.mainGames.find(g => g.id === oldParentId);
+                    if (parentGame && parentGame[oldCategory]) {
+                        const arr = parentGame[oldCategory];
+                        const idx = arr.findIndex(g => g.id === state.editingGameId);
+                        if (idx !== -1) {
+                            editedGame = arr[idx];
+                            if (isLocationChanged) {
+                                ['ports', 'remakes', 'sequels'].forEach(key => {
+                                    if (editedGame[key] && editedGame[key].length > 0) {
+                                        newFranchise.mainGames = newFranchise.mainGames || [];
+                                        newFranchise.mainGames.push(...editedGame[key]);
+                                        editedGame[key] = [];
+                                    }
+                                });
+                                arr.splice(idx, 1);
+                            }
+                        }
+                    }
+                }
+
+                if (!editedGame) {
+                    alert("Could not locate the game being edited.");
+                    return;
+                }
+
+                // Apply core field updates
+                editedGame.title = title;
+                editedGame.year = year;
+                editedGame.platform = platform;
+                editedGame.score = score;
+                editedGame.developer = dev;
+                editedGame.genre = genre;
+                editedGame.status = playStatus;
+                editedGame.ownership = ownership;
+                editedGame.coverImg = finalCover;
+
+                // Reinsert into new location if moved
+                if (isLocationChanged) {
+                    if (!newFranchise.mainGames) newFranchise.mainGames = [];
+
+                    if (category === 'mainGames' || !parentId) {
+                        newFranchise.mainGames.push(editedGame);
+                    } else {
+                        let newParent = newFranchise.mainGames.find(g => g.id === parentId);
+                        if (!newParent) {
+                            // Fallback: if parent cannot be found, make it a main game
+                            newFranchise.mainGames.push(editedGame);
+                        } else {
+                            if (!newParent[category]) newParent[category] = [];
+                            newParent[category].push(editedGame);
+                        }
+                    }
+                }
+
+                state.editingGameId = null;
+                state.editingContext = null;
 
             } else {
                 const newGame = {
